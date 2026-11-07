@@ -1,0 +1,25 @@
+{
+  "source": "github",
+  "repository": "https://github.com/rod1974b-lgtm/zip2weather-pal",
+  "capabilities": [
+    { "capability": "application code", "source": "TanStack Start repository", "outcome": "migrate selected weather experience and static city-art gallery", "status": "in_progress", "next_action": "implement /, /gallery, and /privacy" },
+    { "capability": "schema", "source": "none detected", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "records", "source": "none detected", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "authentication and user identities", "source": "none detected", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "authorization", "source": "none detected", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "local preferences and cached weather", "source": "browser localStorage", "outcome": "migrate on-device only", "status": "in_progress", "next_action": "persist city, units, and last weather for offline viewing" },
+    { "capability": "uploaded artwork bytes", "source": "optional user-uploaded gallery photos", "outcome": "excluded from selected scope", "status": "accepted", "next_action": null },
+    { "capability": "external weather and city-search provider", "source": "Open-Meteo APIs", "outcome": "retain direct client requests", "status": "in_progress", "next_action": "verify current, hourly, 7-day, and geocoding requests" },
+    { "capability": "reverse geocoding and IP location", "source": "Photon and GeoJS", "outcome": "not retained; location consent stays explicit and GPS coordinates are used directly", "status": "accepted", "next_action": null },
+    { "capability": "alerts and public feeds", "source": "TMD, USGS, NWS and secondary Open-Meteo advisories", "outcome": "excluded from the requested simple weather scope", "status": "accepted", "next_action": null },
+    { "capability": "AI artwork generation", "source": "Lovable AI Gateway server function", "outcome": "excluded; gallery remains static and local", "status": "accepted", "next_action": null },
+    { "capability": "payments, ads and supporter entitlements", "source": "PayPal / Buy Me a Coffee / Median bridge and local unlocks", "outcome": "excluded from selected scope", "status": "accepted", "next_action": null },
+    { "capability": "analytics and tracking", "source": "no conventional analytics SDK found; starter has optional injected error-reporting hooks", "outcome": "remove app error-reporting hooks and add no trackers", "status": "in_progress", "next_action": "remove explicit client reporting hook" },
+    { "capability": "public endpoints and callbacks", "source": "no public application endpoints detected", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "scheduled jobs", "source": "none detected", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "secrets", "source": "none required for Open-Meteo", "outcome": "not needed", "status": "verified", "next_action": null },
+    { "capability": "cutover", "source": "unpublished draft", "outcome": "no existing production cutover", "status": "verified", "next_action": null },
+    { "capability": "offline and PWA behavior", "source": "source caches weather data in localStorage but has no service worker", "outcome": "add guarded offline shell caching and cached last forecast", "status": "in_progress", "next_action": "install PWA plugin, cache static shell and Open-Meteo requests, verify offline preview fallback" },
+    { "capability": "verification", "source": "new Lovable project", "outcome": "pending", "status": "pending", "next_action": "check routes, mobile layout, live API flow, privacy and offline cached weather" }
+  ]
+}
