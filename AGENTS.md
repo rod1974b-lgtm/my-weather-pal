@@ -28,3 +28,6 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Keep weather, forecast, and geocoding requests in browser fetches; no account, tracking, payments, AI generation, or server secret is required for the selected app scope.
+- Offline support uses one generated service worker registered through a guarded client wrapper; never register it in development or Lovable preview.

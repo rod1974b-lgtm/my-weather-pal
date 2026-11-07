@@ -1,23 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { WeatherDashboard } from "@/components/WeatherDashboard";
 
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+const description = "Current weather, the hourly forecast for today, and a seven-day outlook, with city search and optional location access.";
+
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "My Weather Pal · Local weather, made easy" },
+      { name: "description", content: description },
+      { property: "og:title", content: "My Weather Pal · Local weather, made easy" },
+      { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: WeatherDashboard,
 });
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
