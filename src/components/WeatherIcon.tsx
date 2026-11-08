@@ -32,10 +32,10 @@ function iconForWeather(code: number, isDay: boolean) {
   if (code === 3) return { key: `04${suffix}`, description: "Overcast", emoji: "☁️" };
   if (code === 45 || code === 48) return { key: isDay ? "fog-day" : "fog-night", description: "Fog", emoji: "🌫️" };
   if (code >= 51 && code <= 57) return { key: isDay ? "drizzle-day" : "drizzle-night", description: "Drizzle", emoji: "🌦️" };
-  if (code === 65 || code === 82) return { key: isDay ? "heavy-rain-day" : "rain-night", description: "Heavy rain", emoji: "🌧️" };
-  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { key: isDay ? "rain-day" : "rain-night", description: "Rain", emoji: "🌧️" };
-  if (code >= 71 && code <= 77) return { key: isDay ? "snow-day" : "snow-night", description: "Snow", emoji: "❄️" };
+  if (code === 65) return { key: isDay ? "heavy-rain-day" : "rain-night", description: "Heavy rain", emoji: "🌧️" };
   if (code >= 80 && code <= 82) return { key: isDay ? "showers-day" : "showers-night", description: "Rain showers", emoji: "🌧️" };
+  if (code >= 61 && code <= 67) return { key: isDay ? "rain-day" : "rain-night", description: "Rain", emoji: "🌧️" };
+  if (code >= 71 && code <= 77) return { key: isDay ? "snow-day" : "snow-night", description: "Snow", emoji: "❄️" };
   if (code >= 95) return { key: isDay ? "storm-day" : "storm-night", description: "Thunderstorm", emoji: "⛈️" };
   return { key: `02${suffix}`, description: "Partly cloudy", emoji: "🌤️" };
 }
