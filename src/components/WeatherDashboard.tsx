@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { CloudSun, Compass, Droplets, LoaderCircle, MapPin, Search, Wind, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WeatherIcon } from "@/components/WeatherIcon";
 import {
   DEFAULT_PLACE,
   describeWeather,
@@ -27,15 +28,6 @@ const LOCAL_ART: Record<string, string> = {
   Default: "/backgrounds/vibrant/ratchaburi_haze.jpg",
   Rain: "/backgrounds/vibrant/storm.jpg",
 };
-
-function WeatherGlyph({ code, size = "text-2xl" }: { code: number; size?: string }) {
-  const { icon } = describeWeather(code);
-  return (
-    <span className={`${size} leading-none`} aria-hidden="true">
-      {icon}
-    </span>
-  );
-}
 
 export function WeatherDashboard() {
   const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
@@ -153,7 +145,7 @@ export function WeatherDashboard() {
           .then((payload: { results?: { name: string; country?: string }[] }) => {
             const result = payload.results?.[0];
             if (result) {
-              choosePlace({ ...nearby, name: result.name, country: result.country });
+              choosePlace({ ...nearby, name: result.name, ...(result.country ? { country: result.country } : {}) });
             }
           })
           .catch(() => undefined);
@@ -174,7 +166,7 @@ export function WeatherDashboard() {
   const cityName = place.name.split(",")[0]?.trim() ?? "";
   const heroImage =
     LOCAL_ART[cityName] ??
-    (weather?.current.code && weather.current.code >= 51 ? LOCAL_ART.Rain : LOCAL_ART.Default);
+    (weather?.current.code && weather.current.code >= 51 ? LOCAL_ART["Rain"] : LOCAL_ART["Default"]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-12 pt-5 sm:px-7 lg:px-10">
@@ -332,7 +324,7 @@ export function WeatherDashboard() {
               Feels like {weather ? Math.round(weather.current.feelsLike) : "—"}°
             </p>
           </div>
-          <span className="mb-2 mr-2 text-7xl drop-shadow-md">{weatherLabel?.icon ?? "🌤️"}</span>
+          <WeatherIcon code={weather?.current.code ?? 1} isDay={weather?.current.isDay ?? true} className="mb-2 mr-2 size-24 drop-shadow-md" />
         </div>
       </section>
 
@@ -382,7 +374,7 @@ export function WeatherDashboard() {
               <span className="text-xs text-muted-foreground">
                 {index === 0 ? "Now" : formatForecastTime(hour.time, weather.timezone)}
               </span>
-              <WeatherGlyph code={hour.code} />
+              <WeatherIcon code={hour.code} isDay={hour.isDay} />
               <strong className="text-sm">{Math.round(hour.temperature)}°</strong>
               <span className="text-xs text-muted-foreground">{Math.round(hour.precipitation)}%</span>
             </div>
@@ -407,7 +399,7 @@ export function WeatherDashboard() {
               <span className="text-sm font-medium">
                 {index === 0 ? "Today" : formatForecastDay(day.date, weather.timezone)}
               </span>
-              <WeatherGlyph code={day.code} />
+              <WeatherIcon code={day.code} />
               <div className="flex justify-end gap-3 text-sm">
                 <strong>{Math.round(day.high)}°</strong>
                 <span className="text-muted-foreground">{Math.round(day.low)}°</span>

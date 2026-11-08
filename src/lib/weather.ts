@@ -13,7 +13,7 @@ export type Weather = {
   fetchedAt: number;
   timezone: string;
   current: { temperature: number; feelsLike: number; code: number; humidity: number; wind: number; isDay: boolean };
-  hourly: { time: string; temperature: number; code: number; precipitation: number }[];
+  hourly: { time: string; temperature: number; code: number; precipitation: number; isDay: boolean }[];
   daily: { date: string; high: number; low: number; code: number; precipitation: number }[];
 };
 
@@ -91,7 +91,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit): Promise<Wea
   const data = await response.json() as {
     timezone: string;
     current: { time: string; temperature_2m: number; apparent_temperature: number; weather_code: number; relative_humidity_2m: number; wind_speed_10m: number; is_day: number };
-    hourly: { time: string[]; temperature_2m: number[]; weather_code: number[]; precipitation_probability: number[] };
+    hourly: { time: string[]; temperature_2m: number[]; weather_code: number[]; precipitation_probability: number[]; is_day?: number[] };
     daily: { time: string[]; weather_code: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; precipitation_probability_max: number[] };
   };
   const hourIndex = Math.max(0, data.hourly.time.findIndex((time) => time >= data.current.time.slice(0, 13)));
@@ -99,11 +99,12 @@ export async function fetchWeather(place: Place, unit: WeatherUnit): Promise<Wea
     place, unit, timezone: data.timezone, fetchedAt: Date.now(),
     current: { temperature: data.current.temperature_2m, feelsLike: data.current.apparent_temperature, code: data.current.weather_code, humidity: data.current.relative_humidity_2m, wind: data.current.wind_speed_10m, isDay: data.current.is_day === 1 },
     hourly: data.hourly.time.slice(hourIndex, hourIndex + 24).map((time, index) => ({
-      time, temperature: index === 0 ? data.current.temperature_2m : data.hourly.temperature_2m[hourIndex + index],
-      code: index === 0 ? data.current.weather_code : data.hourly.weather_code[hourIndex + index],
+      time, temperature: (index === 0 ? data.current.temperature_2m : data.hourly.temperature_2m[hourIndex + index]) ?? data.current.temperature_2m,
+      code: (index === 0 ? data.current.weather_code : data.hourly.weather_code[hourIndex + index]) ?? data.current.weather_code,
       precipitation: data.hourly.precipitation_probability[hourIndex + index] ?? 0,
+      isDay: (data.hourly.is_day?.[hourIndex + index] ?? data.current.is_day) === 1,
     })),
-    daily: data.daily.time.map((date, index) => ({ date, high: data.daily.temperature_2m_max[index], low: data.daily.temperature_2m_min[index], code: data.daily.weather_code[index], precipitation: data.daily.precipitation_probability_max[index] ?? 0 })),
+    daily: data.daily.time.map((date, index) => ({ date, high: data.daily.temperature_2m_max[index] ?? data.current.temperature_2m, low: data.daily.temperature_2m_min[index] ?? data.current.temperature_2m, code: data.daily.weather_code[index] ?? data.current.weather_code, precipitation: data.daily.precipitation_probability_max[index] ?? 0 })),
   };
   try { localStorage.setItem(cacheKey(place, unit), JSON.stringify(weather)); } catch { /* Storage may be disabled. */ }
   return weather;

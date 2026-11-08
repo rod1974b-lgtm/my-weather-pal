@@ -14,6 +14,7 @@ function isPreviewHostname(hostname: string) {
 export async function setupOfflineSupport() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
+  try {
   const hostname = window.location.hostname.toLowerCase();
   const disable =
     new URLSearchParams(window.location.search).has("sw") &&
@@ -38,4 +39,7 @@ export async function setupOfflineSupport() {
   }
 
   await navigator.serviceWorker.register("/sw.js");
+  } catch {
+    // Offline support is optional; a registration failure must not break the app.
+  }
 }
