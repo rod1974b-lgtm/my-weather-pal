@@ -28,7 +28,30 @@ describe("weather forecast caching", () => {
   });
 
   it("shows a valid saved forecast when a refresh is unavailable", () => {
-    const saved: Weather = { place: DEFAULT_PLACE, unit: "metric", fetchedAt: 1, timezone: "Asia/Bangkok", current: { temperature: 29, feelsLike: 33, code: 2, humidity: 70, wind: 8, isDay: true }, hourly: [], daily: [] };
+    const saved: Weather = {
+      place: DEFAULT_PLACE,
+      unit: "metric",
+      fetchedAt: 1,
+      timezone: "Asia/Bangkok",
+      current: {
+        temperature: 29,
+        feelsLike: 33,
+        code: 2,
+        humidity: 70,
+        wind: 8,
+        isDay: true,
+        uvIndex: 0,
+        precipitation: 0,
+        temp: 29,
+        feels: 33,
+        is_day: 1,
+        feels_like: 33,
+        uv_index: 0,
+      },
+      sun: { sunrise: "--:--", sunset: "--:--" },
+      hourly: [],
+      daily: [],
+    };
     localStorage.setItem("weather:last:13.756:100.502:metric", JSON.stringify(saved));
     expect(readCachedWeather(DEFAULT_PLACE, "metric")?.current.temperature).toBe(29);
   });

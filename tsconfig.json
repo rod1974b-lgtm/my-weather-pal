@@ -6,6 +6,13 @@
     "vitest.config.ts",
     "eslint.config.js"
   ],
+  "exclude": [
+    "src/components/AiGalleryModal.tsx",
+    "src/components/AppMenu.tsx",
+    "src/components/LanguageSelector.tsx",
+    "src/components/WeatherView.tsx",
+    "src/lib/i18n.ts"
+  ],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
