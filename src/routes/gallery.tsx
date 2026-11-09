@@ -27,7 +27,7 @@ function GalleryPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const viewWeather = (city: (typeof cities)[number]) => {
-    const place: Place = { name: city.name, country: city.country, latitude: city.coords[0], longitude: city.coords[1] };
+    const place: Place = { name: city.name, country: city.country, lat: city.coords[0], lon: city.coords[1] };
     savePlace(place);
     void navigate({ to: "/" });
   };
