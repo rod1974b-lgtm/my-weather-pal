@@ -11,6 +11,12 @@ const forecast = {
 describe("weather forecast caching", () => {
   beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
+  it("has a valid default place for the server-rendered dashboard", () => {
+    expect(DEFAULT_PLACE.name).toBe("Bangkok");
+    expect(DEFAULT_PLACE.lat).toBe(13.7563);
+    expect(DEFAULT_PLACE.lon).toBe(100.5018);
+  });
+
   it("caches current, 24 hourly values, and seven daily values for the selected city and unit", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(forecast), { status: 200 })));
     const result = await fetchWeather(DEFAULT_PLACE, "metric");
