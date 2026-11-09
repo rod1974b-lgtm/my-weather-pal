@@ -175,6 +175,15 @@ export function loadCached(): Weather | null {
   return readCachedWeather(DEFAULT_PLACE, readUnit());
 }
 
+type GeocodingResult = {
+  id?: number;
+  name?: string;
+  admin1?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
 type ForecastResponse = {
   timezone?: string;
   current: {
@@ -212,24 +221,24 @@ export async function searchCities(query: string): Promise<CityResult[]> {
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&format=json`,
   );
   if (!response.ok) throw new Error("City search failed");
-  const payload = (await response.json()) as { results?: Array<Record<string, unknown>> };
+  const payload = (await response.json()) as { results?: GeocodingResult[] };
   return (payload.results ?? []).flatMap((result) => {
     if (
-      typeof result.id !== "number" ||
-      typeof result.name !== "string" ||
-      typeof result.latitude !== "number" ||
-      typeof result.longitude !== "number"
+      typeof result["id"] !== "number" ||
+      typeof result["name"] !== "string" ||
+      typeof result["latitude"] !== "number" ||
+      typeof result["longitude"] !== "number"
     ) {
       return [];
     }
-    const admin1 = typeof result.admin1 === "string" ? result.admin1 : undefined;
-    const country = typeof result.country === "string" ? result.country : undefined;
-    const name = admin1 && admin1 !== result.name ? `${result.name}, ${admin1}` : result.name;
+    const admin1 = typeof result["admin1"] === "string" ? result["admin1"] : undefined;
+    const country = typeof result["country"] === "string" ? result["country"] : undefined;
+    const name = admin1 && admin1 !== result["name"] ? `${result["name"]}, ${admin1}` : result["name"];
     return [{
-      id: result.id,
+      id: result["id"],
       name,
-      lat: result.latitude,
-      lon: result.longitude,
+      lat: result["latitude"],
+      lon: result["longitude"],
       ...(country ? { country } : {}),
     }];
   });
