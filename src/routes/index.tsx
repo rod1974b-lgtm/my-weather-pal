@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WeatherDashboard } from "@/components/WeatherDashboard";
+import WeatherView from "@/components/WeatherView";
+
 
 const description = "Current weather, the hourly forecast for today, and a seven-day outlook, with city search and optional location access.";
 
