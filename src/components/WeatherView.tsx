@@ -577,69 +577,6 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
     }
     return t("wear_light", "Lightweight breathable fabrics, cotton tee, sunglasses, and sun protection.");
   };
-          : "Structured wool blazer, crisp dress shirt, and optional fine-knit sweater layer.";
-      }
-      if (tempC <= 22) {
-        return lang === "th"
-          ? "สูทหรือเบลเซอร์เนื้อเบา เสื้อเชิ้ตระบายอากาศดี และกางเกงสแล็คทรงสวย"
-          : "Lightweight tailored blazer, breathable poplin dress shirt, and classic chinos or trousers.";
-      }
-      return lang === "th"
-        ? "กางเกงผ้าลินินผสมหรือผ้าวูลเนื้อบาง เสื้อเชิ้ตแขนสั้นทรงสุภาพ และรองเท้าโลฟเฟอร์"
-        : "Breathable linen-blend trousers, lightweight short-sleeve dress shirt, and comfortable loafers.";
-    }
-
-    if (wearCategory === "sports") {
-      if (isRaining) {
-        return lang === "th"
-          ? "เสื้อวิ่งกันน้ำแบบมีฮู้ด หมวกแก๊ปกันฝนเข้าตา และรองเท้าวิ่งยึดเกาะพิเศษ"
-          : "Water-repellent running shell, brimmed cap to shield eyes, and high-traction athletic shoes.";
-      }
-      if (isSnowing || tempC <= 5) {
-        return lang === "th"
-          ? "ชุดรัดกล้ามเนื้อเก็บความอบอุ่น กางเกงวิ่งกันลม ถุงมือวิ่ง และที่คาดหู"
-          : "Thermal compression base layer, windproof running tights, light sports gloves, and ear warmer.";
-      }
-      if (tempC <= 14) {
-        return lang === "th"
-          ? "เสื้อออกกำลังกายแขนยาวผ้าระบายเหงื่อ กางเกงแทร็คแพนต์ และเสื้อกั๊กกันลม"
-          : "Long-sleeve technical athletic shirt, breathable training tights, and lightweight packable wind shell.";
-      }
-      if (tempC <= 22) {
-        return lang === "th"
-          ? "เสื้อยืดดรายฟิตระบายอากาศ กางเกงขาสั้นวิ่ง และถุงเท้ากีฬาซับแรงกระแทก"
-          : "Moisture-wicking athletic tee, performance running shorts, and cushioned sports socks.";
-      }
-      return lang === "th"
-        ? "เสื้อกล้ามหรือเสื้อวิ่งน้ำหนักเบาพิเศษ กางเกงขาสั้นระบายอากาศ และสายรัดข้อมือซับเหงื่อ"
-        : "Ultralight running singlet, breathable running shorts, and sweat wristbands.";
-    }
-
-    // Default: Casual
-    if (isRaining) {
-      return lang === "th"
-        ? "แจ็กเก็ตกันฝนแบบมีฮู้ด รองเท้ากันน้ำ หรือรองเท้าบูท และพกร่มพับติดตัว"
-        : "Waterproof hooded jacket, water-resistant footwear, and a compact travel umbrella.";
-    }
-    if (isSnowing || tempC <= 5) {
-      return lang === "th"
-        ? "เสื้อแจ็กเก็ตบุนวมหรือดาวน์โค้ท เสื้อสเวตเตอร์หนา ผ้าพันคอ และถุงมืออุ่น"
-        : "Heavy insulated down parka, thermal knit sweater, wool scarf, and warm gloves.";
-    }
-    if (tempC <= 14) {
-      return lang === "th"
-        ? "เสื้อแจ็กเก็ตเดนิม สเวตเตอร์ หรือเสื้อฮู้ดดี้ พร้อมกางเกงขายาวใส่สบาย"
-        : "Layered denim jacket, cozy knit sweater, or hoodie with comfortable jeans or chinos.";
-    }
-    if (tempC <= 22) {
-      return lang === "th"
-        ? "เสื้อเชิ้ตแขนยาวผ้าคอตตอน สเวตเตอร์คอกลมเนื้อบาง หรือเสื้อยืดใส่สบาย"
-        : "Long-sleeve cotton shirt, light crewneck sweater, or relaxed casual top.";
-    }
-    return lang === "th"
-      ? "เสื้อยืดผ้าฝ้ายระบายอากาศ กางเกงขาสั้นหรือกางเกงผ้าโปร่งเบา แว่นกันแดด และหมวก"
-      : "Breathable cotton tee, comfortable shorts or light linen pants, sunglasses, and a sun cap.";
-  };
 
   // Weather-smart practical accessories
   const getSmartAccessories = (): string[] => {

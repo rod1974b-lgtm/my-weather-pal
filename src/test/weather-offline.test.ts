@@ -11,6 +11,12 @@ const forecast = {
 describe("weather forecast caching", () => {
   beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
+  it("has a valid default place for the server-rendered dashboard", () => {
+    expect(DEFAULT_PLACE.name).toBe("Bangkok");
+    expect(DEFAULT_PLACE.lat).toBe(13.7563);
+    expect(DEFAULT_PLACE.lon).toBe(100.5018);
+  });
+
   it("caches current, 24 hourly values, and seven daily values for the selected city and unit", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(forecast), { status: 200 })));
     const result = await fetchWeather(DEFAULT_PLACE, "metric");
@@ -22,7 +28,30 @@ describe("weather forecast caching", () => {
   });
 
   it("shows a valid saved forecast when a refresh is unavailable", () => {
-    const saved: Weather = { place: DEFAULT_PLACE, unit: "metric", fetchedAt: 1, timezone: "Asia/Bangkok", current: { temperature: 29, feelsLike: 33, code: 2, humidity: 70, wind: 8, isDay: true }, hourly: [], daily: [] };
+    const saved: Weather = {
+      place: DEFAULT_PLACE,
+      unit: "metric",
+      fetchedAt: 1,
+      timezone: "Asia/Bangkok",
+      current: {
+        temperature: 29,
+        feelsLike: 33,
+        code: 2,
+        humidity: 70,
+        wind: 8,
+        isDay: true,
+        uvIndex: 0,
+        precipitation: 0,
+        temp: 29,
+        feels: 33,
+        is_day: 1,
+        feels_like: 33,
+        uv_index: 0,
+      },
+      sun: { sunrise: "--:--", sunset: "--:--" },
+      hourly: [],
+      daily: [],
+    };
     localStorage.setItem("weather:last:13.756:100.502:metric", JSON.stringify(saved));
     expect(readCachedWeather(DEFAULT_PLACE, "metric")?.current.temperature).toBe(29);
   });

@@ -1,65 +1,152 @@
-export type Place = { name: string; country?: string; lat: number; lon: number };
+export type Place = {
+  name: string;
+  country?: string;
+  lat: number;
+  lon: number;
+};
 
+export type CityResult = Place & { id: number };
 export type WeatherUnit = "metric" | "imperial";
+
+export const DEFAULT_PLACE: Place = {
+  name: "Bangkok",
+  country: "Thailand",
+  lat: 13.7563,
+  lon: 100.5018,
+};
 
 export type Weather = {
   place: Place;
   fetchedAt: number;
   unit: WeatherUnit;
+  timezone: string;
   current: {
-    temp: number;
+    temperature: number;
+    feelsLike: number;
     code: number;
     wind: number;
-    feels: number;
     humidity: number;
+    isDay: boolean;
     uvIndex: number;
     precipitation: number;
-    aqi?: number | undefined;
-    is_day?: number;
+    temp: number;
+    feels: number;
+    is_day: number;
+    feels_like: number;
+    uv_index: number;
+    condition?: string;
+    visibility?: number;
+    aqi?: number;
   };
-  sun: {
-    sunrise: string;
-    sunset: string;
-  };
+  sun: { sunrise: string; sunset: string };
   hourly: {
     time: string;
-    temp: number;
+    temperature: number;
     code: number;
+    precipitation: number;
+    isDay: boolean;
+    temp: number;
     precipProb: number;
-    is_day?: number;
+    is_day: number;
   }[];
   daily: {
     date: string;
+    high: number;
+    low: number;
+    code: number;
+    precipitation: number;
     max: number;
     min: number;
-    code: number;
     precipProbMax: number;
   }[];
 };
 
-const CACHE_KEY = "weather:last";
 const UNIT_KEY = "weather:unit-pref";
+const PLACE_KEY = "weather:place";
+const CACHE_PREFIX = "weather:last:";
 const FAVORITES_KEY = "weather:favorites";
 
-export function loadUnitPref(): WeatherUnit {
+function storage(): Storage | undefined {
+  return typeof window === "undefined" ? undefined : window.localStorage;
+}
+
+function placeCacheKey(place: Place, unit: WeatherUnit): string {
+  return `${CACHE_PREFIX}${place.lat.toFixed(3)}:${place.lon.toFixed(3)}:${unit}`;
+}
+
+function isPlace(value: unknown): value is Place {
+  if (typeof value !== "object" || value === null) return false;
+  const place = value as Partial<Place>;
+  return (
+    typeof place.name === "string" &&
+    typeof place.lat === "number" &&
+    Number.isFinite(place.lat) &&
+    typeof place.lon === "number" &&
+    Number.isFinite(place.lon)
+  );
+}
+
+export function readSavedPlace(): Place | null {
   try {
-    const saved = localStorage.getItem(UNIT_KEY);
-    return saved === "imperial" ? "imperial" : "metric";
+    const raw = storage()?.getItem(PLACE_KEY);
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    return isPlace(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePlace(place: Place): void {
+  try {
+    storage()?.setItem(PLACE_KEY, JSON.stringify(place));
+  } catch {
+    // Storage may be unavailable; weather still works for the current session.
+  }
+}
+
+export function readUnit(): WeatherUnit {
+  try {
+    return storage()?.getItem(UNIT_KEY) === "imperial" ? "imperial" : "metric";
   } catch {
     return "metric";
   }
 }
 
-export function saveUnitPref(unit: WeatherUnit): void {
+export function saveUnit(unit: WeatherUnit): void {
   try {
-    localStorage.setItem(UNIT_KEY, unit);
-  } catch {}
+    storage()?.setItem(UNIT_KEY, unit);
+  } catch {
+    // Storage is optional.
+  }
+}
+
+export function readCachedWeather(place: Place, unit: WeatherUnit): Weather | null {
+  try {
+    const raw = storage()?.getItem(placeCacheKey(place, unit));
+    if (!raw) return null;
+    const cached: unknown = JSON.parse(raw);
+    if (typeof cached !== "object" || cached === null || !("current" in cached)) return null;
+    return cached as Weather;
+  } catch {
+    return null;
+  }
+}
+
+export function loadUnitPref(): WeatherUnit {
+  return readUnit();
+}
+
+export function saveUnitPref(unit: WeatherUnit): void {
+  saveUnit(unit);
 }
 
 export function loadFavorites(): Place[] {
   try {
-    const raw = localStorage.getItem(FAVORITES_KEY);
-    return raw ? (JSON.parse(raw) as Place[]) : [];
+    const raw = storage()?.getItem(FAVORITES_KEY);
+    if (!raw) return [];
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) ? value.filter(isPlace) : [];
   } catch {
     return [];
   }
@@ -67,8 +154,10 @@ export function loadFavorites(): Place[] {
 
 export function saveFavorites(favorites: Place[]): void {
   try {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-  } catch {}
+    storage()?.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  } catch {
+    // Storage is optional.
+  }
 }
 
 export function isSamePlace(a: Place, b: Place): boolean {
@@ -79,126 +168,193 @@ export function isSamePlace(a: Place, b: Place): boolean {
 }
 
 export function isFavorite(place: Place, favorites: Place[]): boolean {
-  return favorites.some((f) => isSamePlace(f, place));
+  return favorites.some((favorite) => isSamePlace(favorite, place));
 }
 
 export function loadCached(): Weather | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as Weather) : null;
-  } catch {
-    return null;
-  }
+  return readCachedWeather(DEFAULT_PLACE, readUnit());
 }
 
-export async function searchCity(q: string): Promise<Place[]> {
-  const r = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&format=json`,
+type GeocodingResult = {
+  id?: number;
+  name?: string;
+  admin1?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
+type ForecastResponse = {
+  timezone?: string;
+  current: {
+    time?: string;
+    temperature_2m: number;
+    apparent_temperature: number;
+    weather_code: number;
+    wind_speed_10m: number;
+    relative_humidity_2m?: number;
+    uv_index?: number;
+    precipitation?: number;
+    visibility?: number;
+    is_day?: number;
+  };
+  hourly: {
+    time: string[];
+    temperature_2m: number[];
+    weather_code: number[];
+    precipitation_probability?: number[];
+    is_day?: number[];
+  };
+  daily: {
+    time: string[];
+    weather_code: number[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    sunrise?: string[];
+    sunset?: string[];
+    precipitation_probability_max?: number[];
+  };
+};
+
+export async function searchCities(query: string): Promise<CityResult[]> {
+  const response = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&format=json`,
   );
-  if (!r.ok) throw new Error("Search failed");
-  const j = await r.json();
-  return (j.results ?? []).map((x: any) => ({
-    name: x.admin1 && x.admin1 !== x.name ? `${x.name}, ${x.admin1}` : x.name,
-    country: x.country,
-    lat: x.latitude,
-    lon: x.longitude,
-  }));
+  if (!response.ok) throw new Error("City search failed");
+  const payload = (await response.json()) as { results?: GeocodingResult[] };
+  return (payload.results ?? []).flatMap((result) => {
+    if (
+      typeof result["id"] !== "number" ||
+      typeof result["name"] !== "string" ||
+      typeof result["latitude"] !== "number" ||
+      typeof result["longitude"] !== "number"
+    ) {
+      return [];
+    }
+    const admin1 = typeof result["admin1"] === "string" ? result["admin1"] : undefined;
+    const country = typeof result["country"] === "string" ? result["country"] : undefined;
+    const name = admin1 && admin1 !== result["name"] ? `${result["name"]}, ${admin1}` : result["name"];
+    return [{
+      id: result["id"],
+      name,
+      lat: result["latitude"],
+      lon: result["longitude"],
+      ...(country ? { country } : {}),
+    }];
+  });
+}
+
+export async function searchCity(query: string): Promise<Place[]> {
+  return searchCities(query);
 }
 
 export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): Promise<Weather> {
-  const tempUnit = unit === "imperial" ? "fahrenheit" : "celsius";
+  const temperatureUnit = unit === "imperial" ? "fahrenheit" : "celsius";
   const windUnit = unit === "imperial" ? "mph" : "kmh";
-  const precipUnit = unit === "imperial" ? "inch" : "mm";
-
-  const weatherUrl =
+  const precipitationUnit = unit === "imperial" ? "inch" : "mm";
+  const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
-    `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,uv_index,precipitation,is_day` +
-    `&hourly=temperature_2m,weather_code,precipitation_probability,is_day` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max` +
-    `&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&precipitation_unit=${precipUnit}` +
-    `&timezone=auto&forecast_days=7`;
+    "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,uv_index,precipitation,is_day,visibility" +
+    "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max" +
+    `&temperature_unit=${temperatureUnit}&wind_speed_unit=${windUnit}&precipitation_unit=${precipitationUnit}` +
+    "&timezone=auto&forecast_days=7";
 
-  const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${place.lat}&longitude=${place.lon}&current=us_aqi`;
-
-  const [weatherRes, aqiRes] = await Promise.allSettled([
-    fetch(weatherUrl).then((r) => {
-      if (!r.ok) throw new Error("Weather request failed");
-      return r.json();
+  const [forecastResult, airQualityResult] = await Promise.allSettled([
+    fetch(url).then(async (response) => {
+      if (!response.ok) throw new Error("Weather request failed");
+      return (await response.json()) as ForecastResponse;
     }),
-    fetch(aqiUrl).then((r) => (r.ok ? r.json() : null)),
+    fetch(
+      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${place.lat}&longitude=${place.lon}&current=us_aqi`,
+    ).then(async (response) => (response.ok ? (await response.json()) as { current?: { us_aqi?: number } } : null)),
   ]);
 
-  if (weatherRes.status === "rejected") {
-    throw new Error("Weather request failed");
-  }
+  if (forecastResult.status === "rejected") throw new Error("Weather request failed");
+  const forecast = forecastResult.value;
+  const current = forecast.current;
+  const timezone = forecast.timezone ?? "UTC";
+  const currentHour = current.time?.slice(0, 13) + ":00";
+  let startIndex = currentHour
+    ? forecast.hourly.time.findIndex((time) => time >= currentHour)
+    : 0;
+  if (startIndex < 0) startIndex = 0;
 
-  const j = weatherRes.value;
-  let aqi: number | undefined;
-  if (aqiRes.status === "fulfilled" && aqiRes.value?.current?.us_aqi !== undefined) {
-    aqi = Math.round(aqiRes.value.current.us_aqi);
-  }
+  const hourly = forecast.hourly.time.slice(startIndex, startIndex + 24).map((time, index) => {
+    const dataIndex = startIndex + index;
+    const temperature = index === 0 ? current.temperature_2m : forecast.hourly.temperature_2m[dataIndex] ?? current.temperature_2m;
+    const code = index === 0 ? current.weather_code : forecast.hourly.weather_code[dataIndex] ?? current.weather_code;
+    const precipProb = forecast.hourly.precipitation_probability?.[dataIndex] ?? 0;
+    const isDay = index === 0 ? current.is_day ?? 1 : forecast.hourly.is_day?.[dataIndex] ?? 1;
+    return { time, temperature, code, precipitation: precipProb, isDay: isDay !== 0, temp: temperature, precipProb, is_day: isDay };
+  });
 
-  // Anchor live hourly forecast to the current hour and roll forward 24 consecutive hours
-  const currentHourIso = j.current?.time ? j.current.time.slice(0, 13) + ":00" : "";
-  let startIdx = j.hourly?.time?.findIndex((t: string) => t >= currentHourIso) ?? 0;
-  if (startIdx === -1) startIdx = 0;
+  const daily = forecast.daily.time.map((date, index) => {
+    const high = forecast.daily.temperature_2m_max[index] ?? current.temperature_2m;
+    const low = forecast.daily.temperature_2m_min[index] ?? current.temperature_2m;
+    const precipitation = forecast.daily.precipitation_probability_max?.[index] ?? 0;
+    return {
+      date,
+      high,
+      low,
+      code: forecast.daily.weather_code[index] ?? current.weather_code,
+      precipitation,
+      max: high,
+      min: low,
+      precipProbMax: precipitation,
+    };
+  });
 
-  const totalHours = j.hourly?.time?.length ?? 0;
-  const count = Math.min(24, Math.max(0, totalHours - startIdx));
-  const hourly = [];
-
-  for (let idx = 0; idx < count; idx++) {
-    const dataIdx = startIdx + idx;
-    hourly.push({
-      time: j.hourly.time[dataIdx],
-      temp: idx === 0 && j.current?.temperature_2m !== undefined ? j.current.temperature_2m : j.hourly.temperature_2m[dataIdx],
-      code: idx === 0 && j.current?.weather_code !== undefined ? j.current.weather_code : j.hourly.weather_code[dataIdx],
-      precipProb: j.hourly.precipitation_probability?.[dataIdx] ?? 0,
-      is_day: idx === 0 && j.current?.is_day !== undefined ? j.current.is_day : (j.hourly.is_day?.[dataIdx] ?? 1),
-    });
-  }
-
-  const formatSunTime = (iso?: string) => (iso ? iso.slice(11, 16) : "--:--");
-  const sunrise = formatSunTime(j.daily.sunrise?.[0]);
-  const sunset = formatSunTime(j.daily.sunset?.[0]);
-
-  const w: Weather = {
+  const temperature = current.temperature_2m;
+  const feelsLike = current.apparent_temperature;
+  const code = current.weather_code;
+  const wind = current.wind_speed_10m;
+  const humidity = current.relative_humidity_2m ?? 0;
+  const uvIndex = current.uv_index ?? 0;
+  const isDay = (current.is_day ?? 1) !== 0;
+  const aqi = airQualityResult.status === "fulfilled" ? airQualityResult.value?.current?.us_aqi : undefined;
+  const weather: Weather = {
     place,
     fetchedAt: Date.now(),
     unit,
+    timezone,
     current: {
-      temp: j.current.temperature_2m,
-      feels: j.current.apparent_temperature,
-      code: j.current.weather_code,
-      wind: j.current.wind_speed_10m,
-      humidity: j.current.relative_humidity_2m ?? 0,
-      uvIndex: Math.round(j.current.uv_index ?? 0),
-      precipitation: j.current.precipitation ?? 0,
-      aqi,
-      is_day: j.current.is_day,
+      temperature,
+      feelsLike,
+      code,
+      wind,
+      humidity,
+      isDay,
+      uvIndex,
+      precipitation: current.precipitation ?? 0,
+      temp: temperature,
+      feels: feelsLike,
+      is_day: isDay ? 1 : 0,
+      feels_like: feelsLike,
+      uv_index: uvIndex,
+      condition: describeWeather(code).label,
+      ...(current.visibility !== undefined ? { visibility: current.visibility } : {}),
+      ...(aqi !== undefined ? { aqi: Math.round(aqi) } : {}),
     },
-    sun: { sunrise, sunset },
+    sun: {
+      sunrise: forecast.daily.sunrise?.[0]?.slice(11, 16) ?? "--:--",
+      sunset: forecast.daily.sunset?.[0]?.slice(11, 16) ?? "--:--",
+    },
     hourly,
-    daily: j.daily.time.map((d: string, i: number) => ({
-      date: d,
-      max: j.daily.temperature_2m_max[i],
-      min: j.daily.temperature_2m_min[i],
-      code: j.daily.weather_code[i],
-      precipProbMax: j.daily.precipitation_probability_max?.[i] ?? 0,
-    })),
+    daily,
   };
 
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(w));
-  } catch {}
-
-  return w;
+    storage()?.setItem(placeCacheKey(place, unit), JSON.stringify(weather));
+  } catch {
+    // A network response should remain usable if caching is unavailable.
+  }
+  return weather;
 }
 
-// Alias export for backwards compatibility
 export const getWeather = fetchWeather;
 
-export function describe(code: number): { label: string; icon: string } {
+export function describeWeather(code: number): { label: string; icon: string } {
   if (code === 0) return { label: "Clear", icon: "☀️" };
   if (code <= 2) return { label: "Partly cloudy", icon: "⛅" };
   if (code === 3) return { label: "Overcast", icon: "☁️" };
@@ -209,6 +365,16 @@ export function describe(code: number): { label: string; icon: string } {
   if (code <= 82) return { label: "Showers", icon: "🌧️" };
   if (code <= 86) return { label: "Snow showers", icon: "🌨️" };
   return { label: "Thunderstorm", icon: "⛈️" };
+}
+
+export const describe = describeWeather;
+
+export function formatForecastTime(time: string, timezone: string): string {
+  return new Intl.DateTimeFormat("en", { hour: "numeric", timeZone: timezone }).format(new Date(time));
+}
+
+export function formatForecastDay(date: string, _timezone: string): string {
+  return new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
 }
 
 export function uvCategory(uv: number): string {
@@ -232,55 +398,34 @@ export function skyKey(code: number, isDay: number | undefined): string {
   if (code <= 2) return day ? "clear-day" : "clear-night";
   if (code === 3) return day ? "cloudy-day" : "cloudy-night";
   if (code <= 48) return "fog";
-  if (code <= 67) return "rain";
-  if (code <= 77) return "snow";
-  if (code <= 82) return "rain";
-  if (code <= 86) return "snow";
+  if (code <= 67 || code <= 82) return "rain";
+  if (code <= 77 || code <= 86) return "snow";
   return "storm";
 }
 
-export function getWeatherAlert(w: Weather): { icon: string; message: string; severity: "info" | "warning" } | null {
-  if (w.current.code >= 95) {
+export function getWeatherAlert(weather: Weather): { icon: string; message: string; severity: "info" | "warning" } | null {
+  if (weather.current.code >= 95) {
     return { icon: "⛈️", message: "Severe thunderstorm warning in this area.", severity: "warning" };
   }
-  if (w.current.code >= 51 && w.current.code <= 82) {
+  if (weather.current.code >= 51 && weather.current.code <= 82) {
     return { icon: "🌧️", message: "Rain currently falling. Roads may be slick.", severity: "info" };
   }
-  const nextRain = w.hourly.slice(0, 4).find((h) => h.precipProb >= 60);
+  const nextRain = weather.hourly.slice(0, 4).find((hour) => hour.precipProb >= 60);
   if (nextRain) {
-    const hour = nextRain.time.slice(11, 16);
-    return {
-      icon: "💧",
-      message: `Rain expected around ${hour} (${nextRain.precipProb}% chance).`,
-      severity: "info",
-    };
+    return { icon: "💧", message: `Rain expected around ${nextRain.time.slice(11, 16)} (${nextRain.precipProb}% chance).`, severity: "info" };
   }
-  const highWindLimit = w.unit === "imperial" ? 25 : 40;
-  if (w.current.wind >= highWindLimit) {
-    return {
-      icon: "💨",
-      message: `High wind advisory: gusts up to ${Math.round(w.current.wind)} ${w.unit === "imperial" ? "mph" : "km/h"}.`,
-      severity: "warning",
-    };
+  const highWindLimit = weather.unit === "imperial" ? 25 : 40;
+  if (weather.current.wind >= highWindLimit) {
+    return { icon: "💨", message: `High wind advisory: gusts up to ${Math.round(weather.current.wind)} ${weather.unit === "imperial" ? "mph" : "km/h"}.`, severity: "warning" };
   }
   return null;
 }
 
-export function getClothingAdvice(w: Weather): string {
-  const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
-  let tip = "";
-
-  if (tempC < 5) tip = "🧥 Heavy winter coat, gloves, and warm layers needed.";
-  else if (tempC < 14) tip = "🧥 A warm jacket or sweater is recommended.";
-  else if (tempC < 21) tip = "👕 Mild weather — light layers or long sleeves work best.";
-  else if (tempC < 28) tip = "🩳 Warm and pleasant — comfortable t-shirt and shorts.";
-  else tip = "☀️ Hot weather — stay hydrated and wear loose, breathable clothes.";
-
-  if (w.current.code >= 51 && w.current.code <= 82) {
-    tip += " Don't forget an umbrella! ☂️";
-  } else if (w.current.uvIndex >= 6) {
-    tip += " High UV — wear sunscreen and sunglasses. 🕶️";
-  }
-
-  return tip;
+export function getClothingAdvice(weather: Weather): string {
+  const celsius = weather.unit === "imperial" ? ((weather.current.temperature - 32) * 5) / 9 : weather.current.temperature;
+  if (celsius < 5) return "🧥 Heavy winter coat, gloves, and warm layers needed.";
+  if (celsius < 14) return "🧥 A warm jacket or sweater is recommended.";
+  if (celsius < 21) return "👕 Mild weather — light layers or long sleeves work best.";
+  if (celsius < 28) return "🩳 Warm and pleasant — comfortable t-shirt and shorts.";
+  return "☀️ Hot weather — stay hydrated and wear loose, breathable clothes.";
 }

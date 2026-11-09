@@ -90,7 +90,7 @@ export function wmoToIconCode(wmo: number, isDay = true): { iconCode: string; de
   return { iconCode: `02${d}`, desc: "Partly cloudy" };
 }
 
-export function getWeatherIconWithFallback(code: string, _description?: string): { url?: string; fallback: string } {
+export function getWeatherIconWithFallback(code: string, _description?: string): { url: string | undefined; fallback: string } {
   const clean = code.trim();
   const url = watercolorIcons[clean] ?? watercolorIcons[clean.slice(0, 3)];
   const fallback = fallbackIcons[clean] ?? fallbackIcons[clean.slice(0, 3)] ?? "🌤️";

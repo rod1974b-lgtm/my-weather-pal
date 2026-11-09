@@ -138,7 +138,7 @@ export function WeatherDashboard() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        const nearby: Place = { name: "My location", latitude, longitude };
+        const nearby: Place = { name: "My location", lat: latitude, lon: longitude };
         choosePlace(nearby);
 
         void fetch(

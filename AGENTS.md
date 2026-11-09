@@ -31,3 +31,4 @@ use the editor.
 
 - Keep weather, forecast, and geocoding requests in browser fetches; no account, tracking, payments, AI generation, or server secret is required for the selected app scope.
 - Offline support uses one generated service worker registered through a guarded client wrapper; never register it in development or Lovable preview.
+- Type-check the active weather app; disconnected legacy UI files remain outside the build until restored with their required dependencies and features.
