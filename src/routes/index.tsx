@@ -19,6 +19,7 @@ import {
   Globe,
   ChevronRight,
   ExternalLink,
+  Check,
 } from "lucide-react";
 import {
   type Place,
@@ -46,6 +47,7 @@ import {
 } from "@/lib/weather";
 import { WeatherIcon } from "@/components/WeatherIcon";
 import { ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE, type RootBeerTier } from "@/lib/monetization";
+import { LANDMARK_WATERCOLORS } from "@/lib/aiWatercolorGenerator";
 
 const LANGUAGES = [
   { code: "en", flag: "🇺🇸", name: "English" },
@@ -64,12 +66,23 @@ const LANGUAGES = [
   { code: "vi", flag: "🇻🇳", name: "Tiếng Việt" },
 ];
 
-const SAMPLE_ARTWORKS = [
-  { name: "Bangkok Grand Palace", url: "/backgrounds/vibrant/bangkok_day_1.webp" },
-  { name: "Bangkok Wat Arun", url: "/backgrounds/vibrant/bangkok_day_2.webp" },
-  { name: "Bangkok Twilight", url: "/backgrounds/vibrant/bangkok_night.webp" },
-  { name: "Ratchaburi Floating Market", url: "/backgrounds/vibrant/ratchaburi_day_1.webp" },
-  { name: "Chiang Mai Mountain Temple", url: "/backgrounds/vibrant/chiangmai_day_1.webp" },
+const CURATED_ARTWORKS = [
+  { name: "Bangkok Sunny Grand Palace", url: "/backgrounds/vibrant/bangkok_sunny.jpg", city: "Bangkok" },
+  { name: "Ratchaburi Atmospheric Haze", url: "/backgrounds/vibrant/ratchaburi_haze.jpg", city: "Ratchaburi" },
+  { name: "Kyoto Golden Pagoda", url: "/backgrounds/vibrant/kyoto_sunny.jpg", city: "Kyoto" },
+  { name: "Skopje Rainy Watercolor", url: "/backgrounds/vibrant/rain_skopje.jpg", city: "Skopje" },
+  { name: "Swiss Alps Mountain Snow", url: "/backgrounds/vibrant/snow_swiss.jpg", city: "Swiss" },
+  { name: "Dramatic Thunderstorm", url: "/backgrounds/vibrant/storm.jpg", city: "Atmosphere" },
+  ...((LANDMARK_WATERCOLORS["bangkok"] || []).slice(1, 3).map((url, i) => ({
+    name: `Bangkok Riverside ${i + 1}`,
+    url,
+    city: "Bangkok",
+  }))),
+  ...((LANDMARK_WATERCOLORS["ratchaburi"] || []).slice(1, 3).map((url, i) => ({
+    name: `Ratchaburi Floating Market ${i + 1}`,
+    url,
+    city: "Ratchaburi",
+  }))),
 ];
 
 type WearCategory = "casual" | "business" | "sports";
@@ -99,11 +112,18 @@ function WeatherPage() {
   const [favorites, setFavorites] = useState<Place[]>([]);
   const [selectedLang, setSelectedLang] = useState("en");
 
+  // Custom AI Background
+  const [activeBg, setActiveBg] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("weather:custom-bg") || null;
+    }
+    return null;
+  });
+
   // Modals
   const [menuOpen, setMenuOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [beerModalOpen, setBeerModalOpen] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<RootBeerTier | null>(null);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -216,7 +236,14 @@ function WeatherPage() {
     );
   }
 
-  // Dynamic wear advice generator
+  function handleSelectBg(url: string | null) {
+    setActiveBg(url);
+    if (typeof window !== "undefined") {
+      if (url) localStorage.setItem("weather:custom-bg", url);
+      else localStorage.removeItem("weather:custom-bg");
+    }
+  }
+
   function getWearAdvice(): { text: string; accessories: string[] } {
     if (!weather) return { text: "Loading outfit recommendation...", accessories: [] };
     const tempC = unit === "imperial" ? ((weather.current.temp - 32) * 5) / 9 : weather.current.temp;
@@ -306,6 +333,10 @@ function WeatherPage() {
   const unitSymbol = unit === "metric" ? "°C" : "°F";
   const windUnit = unit === "metric" ? "km/h" : "mph";
 
+  // Daily high / low fallback from high or max
+  const todayHigh = weather?.daily[0] ? Math.round(weather.daily[0].high ?? weather.daily[0].max ?? 0) : null;
+  const todayLow = weather?.daily[0] ? Math.round(weather.daily[0].low ?? weather.daily[0].min ?? 0) : null;
+
   return (
     <div className="min-h-screen bg-background text-foreground pb-14">
       {/* 1. TOP WEATHER ALERT TICKER */}
@@ -362,7 +393,6 @@ function WeatherPage() {
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </button>
 
-              {/* PULL DOWN MENU BUTTON */}
               <button
                 type="button"
                 onClick={() => setMenuOpen(true)}
@@ -419,7 +449,7 @@ function WeatherPage() {
             )}
           </div>
 
-          {/* Favorites chips */}
+          {/* Favorites */}
           {favorites.length > 0 && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
               <span className="text-muted-foreground text-[11px] shrink-0 font-medium mr-1">
@@ -443,14 +473,26 @@ function WeatherPage() {
           )}
         </header>
 
-        {/* HERO WEATHER */}
+        {/* HERO CARD (WITH ARTWORK BACKGROUND SUPPORT) */}
         {weather && (
           <>
-            <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+            <section
+              className="relative overflow-hidden rounded-2xl border border-border/80 bg-card p-6 shadow-sm transition-all"
+              style={
+                activeBg
+                  ? {
+                      backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0.85)), url(${activeBg})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      color: "#ffffff",
+                    }
+                  : undefined
+              }
+            >
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                    <h2 className="text-2xl font-bold tracking-tight">
                       {place.name}
                     </h2>
                     <button
@@ -465,25 +507,25 @@ function WeatherPage() {
                       />
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className={`text-xs mt-0.5 ${activeBg ? "text-gray-200" : "text-muted-foreground"}`}>
                     {place.admin1 ? `${place.admin1}, ` : ""}
                     {place.country || "Local"}
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-4xl font-extrabold tracking-tight text-foreground">
+                  <span className="text-4xl font-extrabold tracking-tight">
                     {Math.round(weather.current.temp)}
                     {unitSymbol}
                   </span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className={`text-xs mt-0.5 ${activeBg ? "text-gray-200" : "text-muted-foreground"}`}>
                     Feels like {Math.round(weather.current.feels)}
                     {unitSymbol}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between pt-4 border-t border-border/60">
+              <div className={`mt-4 flex items-center justify-between pt-4 border-t ${activeBg ? "border-white/20" : "border-border/60"}`}>
                 <div className="flex items-center gap-3">
                   <WeatherIcon
                     code={weather.current.code}
@@ -491,27 +533,40 @@ function WeatherPage() {
                     size={48}
                   />
                   <div>
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="text-sm font-semibold">
                       {weather.current.label || describeWeather(weather.current.code).label}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={`text-xs ${activeBg ? "text-gray-300" : "text-muted-foreground"}`}>
                       {weather.current.is_day ? "Daytime" : "Nighttime"}
                     </p>
                   </div>
                 </div>
 
-                {weather.daily[0] && (
-                  <div className="text-right text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">
-                      H: {Math.round(weather.daily[0].temp_max)}°
+                {todayHigh !== null && todayLow !== null && (
+                  <div className={`text-right text-xs ${activeBg ? "text-gray-200" : "text-muted-foreground"}`}>
+                    <span className="font-semibold">
+                      H: {todayHigh}°
                     </span>{" "}
-                    · L: {Math.round(weather.daily[0].temp_min)}°
+                    · L: {todayLow}°
                   </div>
                 )}
               </div>
+
+              {activeBg && (
+                <div className="mt-3 flex items-center justify-between text-[11px] text-white/70 pt-2 border-t border-white/10">
+                  <span>Custom AI Background Active</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectBg(null)}
+                    className="underline hover:text-white cursor-pointer"
+                  >
+                    Reset background
+                  </button>
+                </div>
+              )}
             </section>
 
-            {/* 3. WHAT TO WEAR: CASUAL, BUSINESS, SPORTS TABS */}
+            {/* WHAT TO WEAR: CASUAL, BUSINESS, SPORTS */}
             <section className="rounded-xl border border-border/80 bg-card p-4 shadow-xs">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -521,7 +576,6 @@ function WeatherPage() {
                   </h3>
                 </div>
 
-                {/* Casual / Business / Sports Category Selector */}
                 <div className="flex items-center rounded-lg bg-muted/60 p-0.5 text-[11px] font-medium">
                   {(["casual", "business", "sports"] as const).map((cat) => (
                     <button
@@ -544,7 +598,6 @@ function WeatherPage() {
                 {wearData.text}
               </p>
 
-              {/* Recommended Accessories */}
               <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
                 <span className="text-[11px] font-semibold text-muted-foreground mr-1">
                   Accessories:
@@ -588,34 +641,38 @@ function WeatherPage() {
               </div>
             </section>
 
-            {/* 7-DAY FORECAST */}
+            {/* 7-DAY FORECAST (FIXED HIGH & LOW) */}
             <section className="rounded-xl border border-border/80 bg-card p-4 shadow-xs">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                 7-Day Forecast
               </h3>
               <div className="divide-y divide-border/60">
-                {weather.daily.slice(0, 7).map((d, i) => (
-                  <div
-                    key={d.date}
-                    className="flex items-center justify-between py-2.5 text-xs"
-                  >
-                    <span className="w-24 font-medium text-foreground">
-                      {i === 0 ? "Today" : formatForecastDay(d.date, weather.timezone)}
-                    </span>
-                    <div className="flex items-center gap-2 flex-1 px-2">
-                      <WeatherIcon code={d.code} isDay={1} size={24} />
-                      <span className="text-muted-foreground truncate">
-                        {describeWeather(d.code).label}
+                {weather.daily.slice(0, 7).map((d, i) => {
+                  const maxVal = Math.round(d.high ?? d.max ?? 0);
+                  const minVal = Math.round(d.low ?? d.min ?? 0);
+                  return (
+                    <div
+                      key={d.date}
+                      className="flex items-center justify-between py-2.5 text-xs"
+                    >
+                      <span className="w-24 font-medium text-foreground">
+                        {i === 0 ? "Today" : formatForecastDay(d.date, weather.timezone)}
                       </span>
+                      <div className="flex items-center gap-2 flex-1 px-2">
+                        <WeatherIcon code={d.code} isDay={1} size={24} />
+                        <span className="text-muted-foreground truncate">
+                          {describeWeather(d.code).label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 font-bold text-foreground w-16 justify-end">
+                        <span>{maxVal}°</span>
+                        <span className="text-muted-foreground/70 font-normal">
+                          {minVal}°
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 font-bold text-foreground w-16 justify-end">
-                      <span>{Math.round(d.temp_max)}°</span>
-                      <span className="text-muted-foreground/70 font-normal">
-                        {Math.round(d.temp_min)}°
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
@@ -692,7 +749,6 @@ function WeatherPage() {
                 </button>
               </div>
 
-              {/* Language selection */}
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
                   <Globe className="w-3.5 h-3.5" />
@@ -720,7 +776,6 @@ function WeatherPage() {
                 </div>
               </div>
 
-              {/* Action items */}
               <div className="space-y-2 pt-2 border-t border-border">
                 <button
                   type="button"
@@ -763,14 +818,14 @@ function WeatherPage() {
         </div>
       )}
 
-      {/* 5. AI GALLERY MODAL */}
+      {/* 5. AI GALLERY MODAL (WITH ACTIVE SELECTION) */}
       {galleryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4">
           <div className="bg-card border border-border rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-foreground">
                 <ImageIcon className="w-5 h-5 text-primary" />
-                <span>AI Watercolor Gallery</span>
+                <span>AI Watercolor Art Gallery</span>
               </div>
               <button
                 type="button"
@@ -781,25 +836,58 @@ function WeatherPage() {
               </button>
             </div>
 
-            <div className="p-4 overflow-y-auto grid grid-cols-2 gap-3">
-              {SAMPLE_ARTWORKS.map((art) => (
-                <div
-                  key={art.name}
-                  className="group relative rounded-xl overflow-hidden border border-border bg-muted/30 aspect-video flex flex-col justify-end p-2.5"
-                >
-                  <img
-                    src={art.url}
-                    alt={art.name}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
-                    }}
-                  />
-                  <div className="relative z-10 bg-black/60 backdrop-blur-xs rounded-md px-2 py-1 text-[11px] text-white font-medium truncate">
-                    {art.name}
-                  </div>
+            <div className="p-4 overflow-y-auto space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Click any watercolor artwork below to set it as your live weather background:
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {CURATED_ARTWORKS.map((art) => {
+                  const isSelected = activeBg === art.url;
+                  return (
+                    <button
+                      key={art.url}
+                      type="button"
+                      onClick={() => handleSelectBg(art.url)}
+                      className={`group relative rounded-xl overflow-hidden border text-left aspect-video flex flex-col justify-end p-2.5 transition cursor-pointer ${
+                        isSelected
+                          ? "ring-2 ring-primary border-primary shadow-md"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <img
+                        src={art.url}
+                        alt={art.name}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      
+                      <div className="relative z-10 flex items-center justify-between text-white">
+                        <span className="text-[11px] font-semibold truncate pr-1">
+                          {art.name}
+                        </span>
+                        {isSelected && (
+                          <span className="bg-primary text-primary-foreground p-0.5 rounded-full shrink-0">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeBg && (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectBg(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+                  >
+                    Remove background (return to clean mode)
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -816,10 +904,7 @@ function WeatherPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setBeerModalOpen(false);
-                  setSelectedTier(null);
-                }}
+                onClick={() => setBeerModalOpen(false)}
                 className="p-1 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="w-5 h-5" />
