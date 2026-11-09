@@ -8,6 +8,7 @@ import {
   Droplets,
   Wind,
   Sun,
+  Compass,
   AlertTriangle,
   Shirt,
   Loader2,
