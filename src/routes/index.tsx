@@ -76,7 +76,7 @@ function WeatherHome() {
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Favorites state
-  const [favorites, setFavorites] = useState<Place[]>(() => loadFavorites());
+  const [favorites, setFavorites] = useState<Place[]>(() => loadFavorites() || []);
 
   // Wallpaper & Modals
   const [activeBgUrl, setActiveBgUrl] = useState<string | null>(null);
@@ -153,7 +153,7 @@ function WeatherHome() {
   };
 
   const handleToggleFavorite = () => {
-    const isFav = isFavorite(favorites, place);
+    const isFav = isFavorite(place, favorites);
     let next: Place[];
     if (isFav) {
       next = favorites.filter(
@@ -257,7 +257,7 @@ function WeatherHome() {
               <span className="hidden sm:inline">{t("city_art", "City Art")}</span>
             </button>
 
-            {/* Settings AppMenu (Root beer tiers, unit toggle, sky preset, font size, languages) */}
+            {/* Settings AppMenu */}
             <AppMenu
               unit={unit}
               onUnitChange={(newUnit) => {
@@ -380,7 +380,7 @@ function WeatherHome() {
           onRefresh={() => loadForecast(place, unit)}
           onSelectBackground={setActiveBgUrl}
           onSelectBg={setActiveBgUrl}
-          isFav={isFavorite(favorites, place)}
+          isFav={isFavorite(place, favorites)}
           onToggleFavorite={handleToggleFavorite}
           onOpenAiGallery={() => setGalleryOpen(true)}
           customBgUrl={activeBgUrl}
