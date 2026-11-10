@@ -9,25 +9,17 @@ import {
   Wind,
   Sun,
   Compass,
-  AlertTriangle,
   Shirt,
   Loader2,
   X,
   Menu,
-  Image as ImageIcon,
   Beer,
   Globe,
-  ChevronRight,
   ExternalLink,
-  Check,
   Palette,
-  Lock,
-  Unlock,
   Play,
-  Clock,
   Sparkles,
   Camera,
-  ChevronDown,
 } from "lucide-react";
 import {
   type Place,
@@ -57,9 +49,7 @@ import { WeatherIcon } from "@/components/WeatherIcon";
 import {
   ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE,
   unlockWithAd24h,
-  isSlotUnlockedWithAd,
-  getRemainingAdUnlockHours,
-  type RootBeerTier,
+  isAdUnlocked,
 } from "@/lib/monetization";
 import {
   LANDMARK_WATERCOLORS,
@@ -132,7 +122,7 @@ function WeatherHome() {
   const [unit, setUnit] = useState<WeatherUnit>(() => readUnit());
   const [weather, setWeather] = useState<Weather | null>(() => readCachedWeather(place));
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   // Search autocomplete
   const [query, setQuery] = useState("");
@@ -156,6 +146,9 @@ function WeatherHome() {
 
   // Wallpaper Art
   const [activeWallpaperUrl, setActiveWallpaperUrl] = useState<string | null>(null);
+
+  // Ad unlocks for gallery slots
+  const [adUnlockCount, setAdUnlockCount] = useState(0);
 
   // AI Studio state
   const [studioCity, setStudioCity] = useState("");
@@ -191,23 +184,23 @@ function WeatherHome() {
   // Sync background with city or sky preset
   useEffect(() => {
     if (skyPreset === "day") {
-      setActiveWallpaperUrl(WEATHER_WATERCOLORS.clear_day);
+      setActiveWallpaperUrl(WEATHER_WATERCOLORS.clear[0] || null);
       return;
     }
     if (skyPreset === "night") {
-      setActiveWallpaperUrl(WEATHER_WATERCOLORS.clear_night);
+      setActiveWallpaperUrl(WEATHER_WATERCOLORS.clear[1] || WEATHER_WATERCOLORS.clear[0] || null);
       return;
     }
     if (skyPreset === "cloudy") {
-      setActiveWallpaperUrl(WEATHER_WATERCOLORS.cloudy_day);
+      setActiveWallpaperUrl(WEATHER_WATERCOLORS.clouds[0] || null);
       return;
     }
     if (skyPreset === "rain") {
-      setActiveWallpaperUrl(WEATHER_WATERCOLORS.rain);
+      setActiveWallpaperUrl(WEATHER_WATERCOLORS.rain[0] || null);
       return;
     }
     if (skyPreset === "sunset") {
-      setActiveWallpaperUrl(WEATHER_WATERCOLORS.sunset);
+      setActiveWallpaperUrl(WEATHER_WATERCOLORS.clear[1] || WEATHER_WATERCOLORS.clear[0] || null);
       return;
     }
 
@@ -217,8 +210,20 @@ function WeatherHome() {
     if (cityArts && cityArts.length > 0) {
       setActiveWallpaperUrl(cityArts[0]);
     } else if (weather) {
-      const key = skyKey(weather.current.code, weather.current.is_day === 1);
-      setActiveWallpaperUrl(WEATHER_WATERCOLORS[key] || WEATHER_WATERCOLORS.clear_day);
+      const key = skyKey(weather.current.code, weather.current.is_day);
+      const cat = key.includes("rain")
+        ? "rain"
+        : key.includes("snow")
+        ? "snow"
+        : key.includes("storm") || key.includes("thunder")
+        ? "thunderstorm"
+        : key.includes("fog") || key.includes("mist")
+        ? "fog"
+        : key.includes("cloud")
+        ? "clouds"
+        : "clear";
+      const fallbackList = WEATHER_WATERCOLORS[cat] || WEATHER_WATERCOLORS.clear;
+      setActiveWallpaperUrl(fallbackList[0] || null);
     }
   }, [place.name, weather?.current.code, skyPreset]);
 
@@ -257,7 +262,6 @@ function WeatherHome() {
     const newPlace: Place = {
       name: res.name,
       country: res.country,
-      admin1: res.admin1,
       lat: res.lat,
       lon: res.lon,
     };
@@ -381,17 +385,27 @@ function WeatherHome() {
     return "Comfortable layered tee, light cardigan, and casual jeans.";
   };
 
-  const alertItem = weather ? getWeatherAlert(weather.current.code) : null;
+  const alertItem = weather ? getWeatherAlert(weather) : null;
   const isFav = isPlaceInList(place, favorites);
 
   // Artwork list for AI Gallery
   const cityKey = place.name.toLowerCase().trim();
-  const availableArtworks = LANDMARK_WATERCOLORS[cityKey] || [
-    WEATHER_WATERCOLORS.clear_day,
-    WEATHER_WATERCOLORS.sunset,
-    WEATHER_WATERCOLORS.rain,
-    WEATHER_WATERCOLORS.cloudy_day,
+  const availableArtworks = (cityKey && LANDMARK_WATERCOLORS[cityKey]) || [
+    ...WEATHER_WATERCOLORS.clear,
+    ...WEATHER_WATERCOLORS.clouds,
+    ...WEATHER_WATERCOLORS.rain,
   ];
+
+  const checkSlotUnlocked = (idx: number) => {
+    if (idx === 0) return true;
+    return isAdUnlocked(`slot_${place.name.toLowerCase()}_${idx}`);
+  };
+
+  const handleUnlockSlot = (idx: number, artUrl: string) => {
+    unlockWithAd24h(`slot_${place.name.toLowerCase()}_${idx}`);
+    setAdUnlockCount((c) => c + 1);
+    setActiveWallpaperUrl(artUrl);
+  };
 
   return (
     <div className="relative min-h-screen text-foreground selection:bg-amber-500/20">
@@ -443,7 +457,7 @@ function WeatherHome() {
                 <Menu className="h-4 w-4" />
               </button>
 
-              {/* Settings Dropdown Panel (Matches your settings mockup) */}
+              {/* Settings Dropdown Panel */}
               {settingsOpen && (
                 <div className="absolute right-0 top-full mt-2 w-80 z-50 rounded-2xl border border-border/80 bg-popover/95 p-4 shadow-xl backdrop-blur-xl space-y-4 animate-in fade-in-50 duration-150">
                   <div className="flex items-center justify-between border-b border-border/60 pb-2">
@@ -629,9 +643,11 @@ function WeatherHome() {
                   >
                     <div>
                       <span className="font-semibold text-foreground">{res.name}</span>
-                      <span className="ml-1.5 text-xs text-muted-foreground">
-                        {[res.admin1, res.country].filter(Boolean).join(", ")}
-                      </span>
+                      {res.country && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">
+                          {res.country}
+                        </span>
+                      )}
                     </div>
                     <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   </button>
@@ -668,7 +684,7 @@ function WeatherHome() {
           )}
         </section>
 
-        {/* 3. WEATHER ALERT TICKER (Placed right below city search) */}
+        {/* 3. WEATHER ALERT TICKER */}
         <section className="rounded-xl border border-border/70 bg-card overflow-hidden shadow-xs text-card-foreground">
           {alertItem ? (
             <div className="flex items-center px-3 py-2 bg-amber-500/10 text-amber-900 dark:text-amber-200 border-b border-amber-500/20 text-xs">
@@ -677,7 +693,7 @@ function WeatherHome() {
                 <span>WEATHER ADVISORY</span>
               </span>
               <div className="overflow-hidden relative w-full">
-                <span className="font-medium">{alertItem.headline}</span>
+                <span className="font-medium">{alertItem.message}</span>
               </div>
             </div>
           ) : (
@@ -690,7 +706,7 @@ function WeatherHome() {
           )}
         </section>
 
-        {/* Top Action Bar */}
+        {/* Action Bar */}
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {place.name}
@@ -740,7 +756,7 @@ function WeatherHome() {
                   </span>
                 </div>
                 <p className="mt-1 text-sm font-semibold text-foreground capitalize">
-                  {describeWeather(weather.current.code)}
+                  {describeWeather(weather.current.code).label}
                 </p>
               </div>
 
@@ -748,7 +764,7 @@ function WeatherHome() {
                 <WeatherIcon
                   code={weather.current.code}
                   isDay={weather.current.isDay}
-                  size={56}
+                  className="size-14"
                 />
               </div>
             </div>
@@ -787,14 +803,14 @@ function WeatherHome() {
                   Air Quality
                 </span>
                 <p className="text-sm font-bold text-foreground mt-0.5">
-                  {weather.current.aqi ? aqiCategory(weather.current.aqi) : "Good"}
+                  {weather.current.aqi ? aqiCategory(weather.current.aqi).label : "Good"}
                 </p>
               </div>
             </div>
           </section>
         )}
 
-        {/* 5. HOURLY FORECAST (With icon and condition text) */}
+        {/* 5. HOURLY FORECAST */}
         {weather && weather.hourly.length > 0 && (
           <section className="rounded-xl border border-border/70 bg-card/85 p-4 shadow-xs backdrop-blur-md">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
@@ -807,14 +823,14 @@ function WeatherHome() {
                   className="flex flex-col items-center gap-1.5 shrink-0 min-w-[62px] text-center"
                 >
                   <span className="text-[11px] font-medium text-muted-foreground">
-                    {i === 0 ? "Now" : formatForecastTime(h.time)}
+                    {i === 0 ? "Now" : formatForecastTime(h.time, weather.timezone)}
                   </span>
-                  <WeatherIcon code={h.code} isDay={h.isDay} size={30} />
+                  <WeatherIcon code={h.code} isDay={h.isDay} className="size-8" />
                   <span className="text-xs font-bold text-foreground">
                     {Math.round(h.temp)}°
                   </span>
                   <span className="text-[10px] text-muted-foreground truncate max-w-[62px]">
-                    {describeWeather(h.code)}
+                    {describeWeather(h.code).label}
                   </span>
                 </div>
               ))}
@@ -822,7 +838,7 @@ function WeatherHome() {
           </section>
         )}
 
-        {/* 6. 7-DAY FORECAST (With icon, condition text, and high/low) */}
+        {/* 6. 7-DAY FORECAST */}
         {weather && weather.daily.length > 0 && (
           <section className="rounded-xl border border-border/70 bg-card/85 p-4 shadow-xs backdrop-blur-md">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -835,13 +851,13 @@ function WeatherHome() {
                   className="flex items-center justify-between py-2.5 text-xs"
                 >
                   <span className="w-24 font-medium text-foreground">
-                    {i === 0 ? "Today" : formatForecastDay(d.date)}
+                    {i === 0 ? "Today" : formatForecastDay(d.date, weather.timezone)}
                   </span>
 
                   <div className="flex items-center gap-2 flex-1 px-2">
-                    <WeatherIcon code={d.code} isDay={true} size={22} />
+                    <WeatherIcon code={d.code} isDay={true} className="size-6" />
                     <span className="text-muted-foreground truncate">
-                      {describeWeather(d.code)}
+                      {describeWeather(d.code).label}
                     </span>
                   </div>
 
@@ -857,7 +873,7 @@ function WeatherHome() {
           </section>
         )}
 
-        {/* 7. WHAT TO WEAR RECOMMENDATIONS (Casual, Business, Sports) */}
+        {/* 7. WHAT TO WEAR RECOMMENDATIONS */}
         <section className="rounded-xl border border-border/70 bg-card/85 p-4 shadow-xs backdrop-blur-md space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -895,7 +911,7 @@ function WeatherHome() {
         </footer>
       </div>
 
-      {/* AI WATERCOLOR STUDIO MODAL (Matches your AI Creator screenshot) */}
+      {/* AI WATERCOLOR STUDIO MODAL */}
       {galleryOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
@@ -1001,12 +1017,11 @@ function WeatherHome() {
 
               <div className="grid grid-cols-2 gap-2.5">
                 {availableArtworks.map((artUrl, idx) => {
-                  const isUnlocked = isSlotUnlockedWithAd(place.name, idx);
-                  const remainingHours = getRemainingAdUnlockHours(place.name, idx);
+                  const isUnlocked = checkSlotUnlocked(idx);
 
                   return (
                     <div
-                      key={artUrl + idx}
+                      key={`${artUrl}-${idx}-${adUnlockCount}`}
                       className="group relative rounded-xl border border-border/80 overflow-hidden bg-muted aspect-video shadow-xs"
                     >
                       <img
@@ -1018,7 +1033,7 @@ function WeatherHome() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-2 flex flex-col justify-end text-white">
                         <div className="flex items-center justify-between text-[11px]">
                           <span>Slot #{idx + 1}</span>
-                          {idx === 0 || isUnlocked ? (
+                          {isUnlocked ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -1032,10 +1047,7 @@ function WeatherHome() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => {
-                                unlockWithAd24h(place.name, idx);
-                                setActiveWallpaperUrl(artUrl);
-                              }}
+                              onClick={() => handleUnlockSlot(idx, artUrl)}
                               className="flex items-center gap-1 rounded-md bg-amber-600/90 hover:bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs"
                             >
                               <Play className="h-2.5 w-2.5" />
@@ -1046,7 +1058,7 @@ function WeatherHome() {
 
                         {idx > 0 && isUnlocked && (
                           <span className="text-[9px] text-amber-300 mt-0.5">
-                            Unlocked ({remainingHours}h remaining)
+                            Unlocked (24h)
                           </span>
                         )}
                       </div>
@@ -1075,7 +1087,7 @@ function WeatherHome() {
                       {tier.name}
                     </span>
                     <span className="text-[10px] text-muted-foreground line-clamp-1">
-                      {tier.benefit}
+                      {tier.tagline || tier.displayPrice}
                     </span>
                   </a>
                 ))}
