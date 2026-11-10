@@ -20,6 +20,8 @@ import {
   Play,
   Sparkles,
   Camera,
+  Lock,
+  Check,
 } from "lucide-react";
 import {
   type Place,
@@ -50,6 +52,8 @@ import {
   ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE,
   unlockWithAd24h,
   isAdUnlocked,
+  saveThankYouBackgroundForever,
+  isThankYouBackgroundUnlocked,
 } from "@/lib/monetization";
 import {
   LANDMARK_WATERCOLORS,
@@ -99,12 +103,12 @@ const LANGUAGES = [
 ];
 
 const SKY_OPTIONS = [
-  { id: "auto", label: "Auto (weather)" },
-  { id: "day", label: "Sunny day" },
-  { id: "night", label: "Clear night" },
-  { id: "cloudy", label: "Cloudy day" },
-  { id: "rain", label: "Rain" },
-  { id: "sunset", label: "Sunset" },
+  { id: "auto", label: "Auto (weather)", locked: false },
+  { id: "day", label: "Sunny day", locked: false },
+  { id: "night", label: "Clear night", locked: false },
+  { id: "cloudy", label: "Cloudy day", locked: false },
+  { id: "rain", label: "Rain (Ad / Supporter)", locked: true },
+  { id: "sunset", label: "Sunset (Ad / Supporter)", locked: true },
 ];
 
 const FONT_OPTIONS = [
@@ -147,8 +151,26 @@ function WeatherHome() {
   // Wallpaper Art
   const [activeWallpaperUrl, setActiveWallpaperUrl] = useState<string | null>(null);
 
-  // Ad unlocks for gallery slots
+  // Ad & Root Beer Unlock Modal state
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [pendingUnlockTarget, setPendingUnlockTarget] = useState<{
+    key: string;
+    url: string;
+    title: string;
+  } | null>(null);
+  const [watchingAd, setWatchingAd] = useState(false);
   const [adUnlockCount, setAdUnlockCount] = useState(0);
+
+  // Root Beer Supporter status
+  const [hasSupporterTier, setHasSupporterTier] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      localStorage.getItem("no_ads_forever") === "true" ||
+      ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.some((t) =>
+        isThankYouBackgroundUnlocked(t.id)
+      )
+    );
+  });
 
   // AI Studio state
   const [studioCity, setStudioCity] = useState("");
@@ -180,6 +202,12 @@ function WeatherHome() {
   useEffect(() => {
     loadForecast(place, unit);
   }, [place.lat, place.lon, unit]);
+
+  // Check if a background or slot is currently unlocked
+  const isBackgroundUnlocked = (targetKey: string): boolean => {
+    if (hasSupporterTier) return true;
+    return isAdUnlocked(targetKey);
+  };
 
   // Sync background with city or sky preset
   useEffect(() => {
@@ -393,25 +421,93 @@ function WeatherHome() {
     ...WEATHER_WATERCOLORS.rain,
   ];
 
+  // Cycling artwork: slot 0 is free; slots 1+ require an ad or supporter tier
   const handleNextArtwork = () => {
     if (!availableArtworks.length) return;
     const currentIdx = availableArtworks.indexOf(activeWallpaperUrl || "");
     const nextIdx = (currentIdx + 1) % availableArtworks.length;
-    setActiveWallpaperUrl(availableArtworks[nextIdx]);
+    const nextUrl = availableArtworks[nextIdx];
+    const slotKey = `slot_${place.name.toLowerCase().trim()}_${nextIdx}`;
+
+    if (nextIdx > 0 && !isBackgroundUnlocked(slotKey)) {
+      setPendingUnlockTarget({
+        key: slotKey,
+        url: nextUrl,
+        title: `${place.name} Artwork #${nextIdx + 1}`,
+      });
+      setUnlockModalOpen(true);
+      return;
+    }
+
+    setActiveWallpaperUrl(nextUrl);
   };
 
-  const checkSlotUnlocked = (idx: number) => {
-    if (idx === 0) return true;
-    return isAdUnlocked(`slot_${place.name.toLowerCase()}_${idx}`);
-  };
-
-  const handleUnlockSlot = (idx: number, artUrl: string) => {
-    unlockWithAd24h(`slot_${place.name.toLowerCase()}_${idx}`);
-    setAdUnlockCount((c) => c + 1);
+  // Selecting a slot in the gallery
+  const handleSelectGallerySlot = (idx: number, artUrl: string) => {
+    const slotKey = `slot_${place.name.toLowerCase().trim()}_${idx}`;
+    if (idx > 0 && !isBackgroundUnlocked(slotKey)) {
+      setPendingUnlockTarget({
+        key: slotKey,
+        url: artUrl,
+        title: `${place.name} Slot #${idx + 1}`,
+      });
+      setUnlockModalOpen(true);
+      return;
+    }
     setActiveWallpaperUrl(artUrl);
+    setGalleryOpen(false);
   };
 
-  // Sky ambient background styles
+  // Selecting a sky background in settings
+  const handleSelectSkyPreset = (presetId: string) => {
+    const option = SKY_OPTIONS.find((s) => s.id === presetId);
+    if (option?.locked && presetId !== "auto" && presetId !== "day" && presetId !== "night") {
+      const presetKey = `sky_${presetId}`;
+      if (!isBackgroundUnlocked(presetKey)) {
+        const targetUrl =
+          presetId === "rain"
+            ? WEATHER_WATERCOLORS.rain[0]
+            : WEATHER_WATERCOLORS.clear[1] || WEATHER_WATERCOLORS.clouds[0];
+        setPendingUnlockTarget({
+          key: presetKey,
+          url: targetUrl || "",
+          title: `${option.label} Sky`,
+        });
+        setUnlockModalOpen(true);
+        return;
+      }
+    }
+    setSkyPreset(presetId);
+  };
+
+  // Complete ad watch (24h unlock)
+  const handleCompleteWatchAd = () => {
+    if (!pendingUnlockTarget) return;
+    setWatchingAd(true);
+    setTimeout(() => {
+      unlockWithAd24h(pendingUnlockTarget.key);
+      if (pendingUnlockTarget.url) {
+        setActiveWallpaperUrl(pendingUnlockTarget.url);
+      }
+      setAdUnlockCount((c) => c + 1);
+      setWatchingAd(false);
+      setUnlockModalOpen(false);
+      setPendingUnlockTarget(null);
+    }, 2200);
+  };
+
+  // Confirm Root Beer Supporter Tier (Lifetime unlock for all backgrounds)
+  const handleClaimSupporterTier = (tierId: string) => {
+    saveThankYouBackgroundForever(tierId);
+    setHasSupporterTier(true);
+    if (pendingUnlockTarget?.url) {
+      setActiveWallpaperUrl(pendingUnlockTarget.url);
+    }
+    setUnlockModalOpen(false);
+    setPendingUnlockTarget(null);
+  };
+
+  // Ambient sky background style
   const getSkyBackgroundClass = () => {
     if (skyPreset === "day") return "from-sky-400/20 via-amber-200/10 to-background";
     if (skyPreset === "night") return "from-indigo-950/40 via-slate-900/30 to-background";
@@ -424,7 +520,7 @@ function WeatherHome() {
 
   return (
     <div className="relative min-h-screen text-foreground selection:bg-amber-500/20">
-      {/* 1. SEPARATE AMBIENT FULL-APP BACKGROUND (Subtle sky / atmosphere tint) */}
+      {/* 1. SEPARATE AMBIENT FULL-APP BACKGROUND */}
       <div
         className={`fixed inset-0 pointer-events-none z-0 transition-all duration-700 bg-gradient-to-b ${getSkyBackgroundClass()}`}
       />
@@ -492,12 +588,17 @@ function WeatherHome() {
                     <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold text-xs">
                       <Beer className="h-4 w-4" />
                       <span>Root Beer Supporter Tiers</span>
+                      {hasSupporterTier && (
+                        <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                          <Check className="h-3 w-3" /> Active
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Support ongoing private weather & unlock special city wallpapers.
+                      Support ongoing private weather & unlock all backgrounds ad-free forever.
                     </p>
                     <a
-                      href="https://buymeacoffee.com"
+                      href="https://buymeacoffee.com/rod1974b"
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline pt-1"
@@ -551,7 +652,7 @@ function WeatherHome() {
                     </label>
                     <select
                       value={skyPreset}
-                      onChange={(e) => setSkyPreset(e.target.value)}
+                      onChange={(e) => handleSelectSkyPreset(e.target.value)}
                       className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
                     >
                       {SKY_OPTIONS.map((opt) => (
@@ -760,7 +861,7 @@ function WeatherHome() {
           </div>
         </div>
 
-        {/* 4. DEDICATED AI WALLPAPER HERO CANVAS (Full, Unobstructed City Picture) */}
+        {/* 4. DEDICATED AI WALLPAPER HERO CANVAS (Separated from Current Weather) */}
         {activeWallpaperUrl && (
           <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-card shadow-md">
             <div className="relative h-60 sm:h-72 w-full overflow-hidden bg-muted">
@@ -778,10 +879,13 @@ function WeatherHome() {
                   type="button"
                   onClick={handleNextArtwork}
                   className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/45 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition hover:bg-black/65 cursor-pointer shadow-xs"
-                  title="Next Artwork"
+                  title="Next Artwork (Requires Ad or Supporter)"
                 >
                   <RefreshCw className="h-3 w-3" />
                   <span>Next Art</span>
+                  {!hasSupporterTier && (
+                    <Lock className="h-2.5 w-2.5 text-amber-400" />
+                  )}
                 </button>
                 <button
                   type="button"
@@ -1004,6 +1108,100 @@ function WeatherHome() {
         </footer>
       </div>
 
+      {/* REWARDED AD / ROOT BEER UNLOCK MODAL */}
+      {unlockModalOpen && pendingUnlockTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl border border-amber-500/40 bg-card p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border/60 pb-2">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <Lock className="h-4 w-4" />
+                <h3 className="text-sm font-bold text-foreground">
+                  Unlock Background
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUnlockModalOpen(false);
+                  setPendingUnlockTarget(null);
+                }}
+                className="text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <p className="font-semibold text-foreground">
+                {pendingUnlockTarget.title}
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                Watch a quick 24-hour sponsored ad to unlock this artwork, or get a Root Beer Supporter Tier to unlock all backgrounds forever.
+              </p>
+            </div>
+
+            {/* Unlock Options */}
+            <div className="space-y-2 pt-1">
+              {/* Option 1: Watch Ad (24 Hours) */}
+              <button
+                type="button"
+                disabled={watchingAd}
+                onClick={handleCompleteWatchAd}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-4 text-xs shadow-xs transition cursor-pointer disabled:opacity-60"
+              >
+                {watchingAd ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Viewing Ad (Unlocking 24h)...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    <span>Watch Ad (Unlock for 24 Hours)</span>
+                  </>
+                )}
+              </button>
+
+              {/* Option 2: Buy a Root Beer Supporter Tier */}
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <Beer className="h-3.5 w-3.5" />
+                    <span>Root Beer Supporter</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                    Forever Ad-Free
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Unlock all sky & city wallpapers permanently without needing ads.
+                </p>
+
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <a
+                    href="https://buymeacoffee.com/rod1974b"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-card py-1.5 px-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 transition"
+                  >
+                    <span>Buy Root Beer</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => handleClaimSupporterTier("small_root_beer_tier")}
+                    className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white py-1.5 px-2 text-[11px] font-semibold transition cursor-pointer"
+                  >
+                    <span>Claim Lifetime</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI WATERCOLOR STUDIO MODAL */}
       {galleryOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -1102,7 +1300,7 @@ function WeatherHome() {
               </div>
             </div>
 
-            {/* City Artwork Collection & 24h Slots */}
+            {/* City Artwork Collection & 24h Gated Slots */}
             <div className="space-y-2">
               <span className="text-xs font-bold text-foreground">
                 {place.name} Artworks & Slots
@@ -1110,7 +1308,8 @@ function WeatherHome() {
 
               <div className="grid grid-cols-2 gap-2.5">
                 {availableArtworks.map((artUrl, idx) => {
-                  const isUnlocked = checkSlotUnlocked(idx);
+                  const slotKey = `slot_${place.name.toLowerCase().trim()}_${idx}`;
+                  const isUnlocked = idx === 0 || isBackgroundUnlocked(slotKey);
 
                   return (
                     <div
@@ -1125,33 +1324,36 @@ function WeatherHome() {
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-2 flex flex-col justify-end text-white">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span>Slot #{idx + 1}</span>
-                          {isUnlocked ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveWallpaperUrl(artUrl);
-                                setGalleryOpen(false);
-                              }}
-                              className="rounded-md bg-amber-500 hover:bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs"
-                            >
-                              Apply
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleUnlockSlot(idx, artUrl)}
-                              className="flex items-center gap-1 rounded-md bg-amber-600/90 hover:bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs"
-                            >
-                              <Play className="h-2.5 w-2.5" />
-                              <span>Watch Ad (24h)</span>
-                            </button>
-                          )}
+                          <span className="flex items-center gap-1">
+                            <span>Slot #{idx + 1}</span>
+                            {!isUnlocked && (
+                              <Lock className="h-3 w-3 text-amber-400" />
+                            )}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSelectGallerySlot(idx, artUrl)}
+                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold text-white shadow-xs transition cursor-pointer ${
+                              isUnlocked
+                                ? "bg-amber-500 hover:bg-amber-600"
+                                : "bg-amber-600/90 hover:bg-amber-600 flex items-center gap-1"
+                            }`}
+                          >
+                            {isUnlocked ? (
+                              "Apply"
+                            ) : (
+                              <>
+                                <Play className="h-2.5 w-2.5" />
+                                <span>Unlock</span>
+                              </>
+                            )}
+                          </button>
                         </div>
 
                         {idx > 0 && isUnlocked && (
                           <span className="text-[9px] text-amber-300 mt-0.5">
-                            Unlocked (24h)
+                            {hasSupporterTier ? "Unlocked (Lifetime)" : "Unlocked (24h)"}
                           </span>
                         )}
                       </div>
@@ -1171,7 +1373,7 @@ function WeatherHome() {
                 {ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.map((tier) => (
                   <a
                     key={tier.id}
-                    href="https://buymeacoffee.com"
+                    href="https://buymeacoffee.com/rod1974b"
                     target="_blank"
                     rel="noreferrer"
                     className="flex flex-col p-2 rounded-lg bg-card/80 border border-border/80 hover:border-amber-500 transition"
