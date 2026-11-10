@@ -258,125 +258,122 @@ function WeatherHome() {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  const handleSelectCity = (res: CityResult) => {
+  const handleSelectCity = (city: CityResult) => {
     const newPlace: Place = {
-      name: res.name,
-      country: res.country,
-      lat: res.lat,
-      lon: res.lon,
+      name: city.name,
+      country: city.country,
+      lat: city.lat,
+      lon: city.lon,
     };
     setPlace(newPlace);
     savePlace(newPlace);
     setQuery("");
+    setResults([]);
     setSearchOpen(false);
   };
 
   const handleToggleFavorite = () => {
-    const isFav = isPlaceInList(place, favorites);
-    let next: Place[];
-    if (isFav) {
-      next = favorites.filter((f) => !isSamePlace(f, place));
-    } else {
-      next = [place, ...favorites.slice(0, 9)];
-    }
-    setFavorites(next);
-    saveFavorites(next);
+    const exists = isPlaceInList(place, favorites);
+    const updated = exists
+      ? favorites.filter((f) => !isSamePlace(f, place))
+      : [...favorites, place];
+    setFavorites(updated);
+    saveFavorites(updated);
   };
 
   const handleUseLocation = () => {
     setLocationDialogOpen(false);
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
+      alert("Geolocation is not supported by your browser");
       return;
     }
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        let locName = "Current Location";
         try {
-          const resp = await fetch(
+          const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
-          const data = await resp.json();
-          const detectedCity =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            data.address?.county ||
-            "My Location";
-          const detectedCountry = data.address?.country || "";
-
-          const userPlace: Place = {
-            name: detectedCity,
-            country: detectedCountry,
-            lat: latitude,
-            lon: longitude,
-          };
-          setPlace(userPlace);
-          savePlace(userPlace);
-        } catch {
-          const fallbackPlace: Place = {
-            name: "Current Location",
-            lat: latitude,
-            lon: longitude,
-          };
-          setPlace(fallbackPlace);
-          savePlace(fallbackPlace);
-        } finally {
-          setLocationLoading(false);
-        }
+          const data = await res.json();
+          if (data?.address) {
+            locName =
+              data.address.city ||
+              data.address.town ||
+              data.address.village ||
+              data.address.suburb ||
+              "Current Location";
+          }
+        } catch {}
+        const locPlace: Place = {
+          name: locName,
+          lat: latitude,
+          lon: longitude,
+        };
+        setPlace(locPlace);
+        savePlace(locPlace);
+        setLocationLoading(false);
       },
-      () => setLocationLoading(false),
-      { timeout: 12000, enableHighAccuracy: true }
+      () => {
+        setLocationLoading(false);
+        alert("Location access was denied or timed out.");
+      },
+      { timeout: 10000 }
     );
   };
 
-  // Weather calculations
-  const tempC = weather
-    ? unit === "imperial"
-      ? ((weather.current.temp - 32) * 5) / 9
-      : weather.current.temp
-    : 24;
-
-  const getClothingAdvice = () => {
-    if (!weather) return "Loading recommendations...";
+  const getClothingAdvice = (): string => {
+    if (!weather) return "Loading outfit guidance...";
+    const tempC =
+      unit === "imperial"
+        ? ((weather.current.temp - 32) * 5) / 9
+        : weather.current.temp;
     const code = weather.current.code;
-    const isRain = code >= 51 && code <= 99;
+    const isRain =
+      code >= 95 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
+    const isSnow = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
 
     if (wearTab === "business") {
       if (isRain) {
-        return "Tailored commuter trench coat, water-resistant dress shoes, and a sturdy business umbrella.";
+        return "Commuter trench coat, polished water-resistant dress shoes, and a sturdy business umbrella.";
       }
-      if (tempC <= 10) {
-        return "Tailored wool overcoat, crisp shirt with merino sweater, and leather dress shoes.";
+      if (isSnow || tempC <= 5) {
+        return "Tailored wool overcoat over suit, cashmere knit scarf, and insulated dress leather gloves.";
+      }
+      if (tempC <= 14) {
+        return "Structured wool blazer, crisp dress shirt, and optional fine-knit sweater layer.";
       }
       if (tempC >= 26) {
-        return "Breathable linen-blend shirt or blouse, lightweight tailored chinos, and loafers.";
+        return "Breathable linen-blend trousers, lightweight short-sleeve dress shirt, and loafers.";
       }
-      return "Classic blazer layered over a dress shirt with chinos or tailored slacks.";
+      return "Lightweight tailored blazer, breathable poplin dress shirt, and classic chinos.";
     }
 
     if (wearTab === "sports") {
       if (isRain) {
-        return "Waterproof running shell jacket, moisture-wicking tights, and water-repellent trail shoes.";
+        return "Water-repellent running shell, brimmed cap to shield eyes, and high-traction athletic shoes.";
       }
-      if (tempC <= 10) {
-        return "Thermal base layer, windproof running jacket, running tights, and light athletic gloves.";
+      if (isSnow || tempC <= 5) {
+        return "Thermal compression base layer, windproof running tights, light sports gloves, and ear warmer.";
+      }
+      if (tempC <= 14) {
+        return "Long-sleeve technical athletic shirt, breathable training tights, and lightweight wind shell.";
       }
       if (tempC >= 26) {
-        return "Moisture-wicking athletic tank or tee, breathable shorts, sweatband, and hydration pack.";
+        return "Ultra-breathable mesh singlet, anti-chafing running shorts, sweatband, and electrolyte hydration.";
       }
-      return "Performance long-sleeve tee, flexible athletic joggers, and cushioned runners.";
+      return "Moisture-wicking technical tee, lightweight running shorts, and cushioned trainers.";
     }
 
     // Casual
     if (isRain) {
-      return "Water-resistant windbreaker, comfortable denim, and a sturdy compact umbrella.";
+      return "Carry a sturdy umbrella or rain jacket, water-resistant sneakers, and a water-safe bag.";
     }
-    if (tempC <= 8) {
-      return "Heavy thermal coat, warm knit sweater, cozy scarf, and winter boots.";
+    if (isSnow || tempC <= 5) {
+      return "Heavy winter coat, thermal layers, warm knit beanie, scarf, and insulated boots.";
     }
-    if (tempC <= 18) {
+    if (tempC <= 14) {
       return "Light jacket, denim layered over a hoodie, and comfortable sneakers.";
     }
     if (tempC >= 26) {
@@ -388,13 +385,20 @@ function WeatherHome() {
   const alertItem = weather ? getWeatherAlert(weather) : null;
   const isFav = isPlaceInList(place, favorites);
 
-  // Artwork list for AI Gallery
+  // Artwork list for AI Gallery & Next Art cycling
   const cityKey = place.name.toLowerCase().trim();
   const availableArtworks = (cityKey && LANDMARK_WATERCOLORS[cityKey]) || [
     ...WEATHER_WATERCOLORS.clear,
     ...WEATHER_WATERCOLORS.clouds,
     ...WEATHER_WATERCOLORS.rain,
   ];
+
+  const handleNextArtwork = () => {
+    if (!availableArtworks.length) return;
+    const currentIdx = availableArtworks.indexOf(activeWallpaperUrl || "");
+    const nextIdx = (currentIdx + 1) % availableArtworks.length;
+    setActiveWallpaperUrl(availableArtworks[nextIdx]);
+  };
 
   const checkSlotUnlocked = (idx: number) => {
     if (idx === 0) return true;
@@ -407,17 +411,29 @@ function WeatherHome() {
     setActiveWallpaperUrl(artUrl);
   };
 
+  // Sky ambient background styles
+  const getSkyBackgroundClass = () => {
+    if (skyPreset === "day") return "from-sky-400/20 via-amber-200/10 to-background";
+    if (skyPreset === "night") return "from-indigo-950/40 via-slate-900/30 to-background";
+    if (skyPreset === "cloudy") return "from-slate-400/20 via-zinc-300/10 to-background";
+    if (skyPreset === "rain") return "from-slate-700/30 via-sky-900/20 to-background";
+    if (skyPreset === "sunset") return "from-orange-500/25 via-rose-500/15 to-background";
+    if (weather && !weather.current.isDay) return "from-indigo-950/30 via-slate-900/20 to-background";
+    return "from-amber-500/10 via-sky-500/10 to-background";
+  };
+
   return (
     <div className="relative min-h-screen text-foreground selection:bg-amber-500/20">
-      {/* 1. SEPARATE FULL-APP WALLPAPER BACKGROUND */}
+      {/* 1. SEPARATE AMBIENT FULL-APP BACKGROUND (Subtle sky / atmosphere tint) */}
       <div
-        className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-700 bg-cover bg-center"
-        style={{
-          backgroundImage: activeWallpaperUrl ? `url("${activeWallpaperUrl}")` : undefined,
-          opacity: activeWallpaperUrl ? 0.38 : 0.15,
-        }}
+        className={`fixed inset-0 pointer-events-none z-0 transition-all duration-700 bg-gradient-to-b ${getSkyBackgroundClass()}`}
       />
-      <div className="fixed inset-0 pointer-events-none z-0 backdrop-blur-[2px] bg-background/70" />
+      {activeWallpaperUrl && (
+        <div
+          className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-700 bg-cover bg-center opacity-[0.08]"
+          style={{ backgroundImage: `url("${activeWallpaperUrl}")` }}
+        />
+      )}
 
       {/* Main content wrapper */}
       <div className="relative z-10 mx-auto max-w-2xl px-3 py-4 sm:px-4 sm:py-6 space-y-4">
@@ -523,12 +539,12 @@ function WeatherHome() {
                             : "bg-muted text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        US Imperial (°F, mph)
+                        US (°F, mph)
                       </button>
                     </div>
                   </div>
 
-                  {/* Sky Background Preset Dropdown */}
+                  {/* Sky Background Preset */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Sky Background
@@ -536,7 +552,7 @@ function WeatherHome() {
                     <select
                       value={skyPreset}
                       onChange={(e) => setSkyPreset(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
                     >
                       {SKY_OPTIONS.map((opt) => (
                         <option key={opt.id} value={opt.id}>
@@ -546,34 +562,39 @@ function WeatherHome() {
                     </select>
                   </div>
 
-                  {/* Font Size Preset Dropdown */}
+                  {/* Text Size Scale */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Text Size
                     </label>
-                    <select
-                      value={fontSize}
-                      onChange={(e) => setFontSize(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    >
+                    <div className="grid grid-cols-3 gap-1.5">
                       {FONT_OPTIONS.map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label}
-                        </option>
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setFontSize(opt.id)}
+                          className={`rounded-lg py-1 text-[11px] font-semibold transition ${
+                            fontSize === opt.id
+                              ? "bg-amber-500 text-white"
+                              : "bg-muted text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {opt.label.split(" ")[0]}
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
 
                   {/* Language Selector */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 pt-1 border-t border-border/60">
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Globe className="h-3 w-3" />
+                      <Globe className="h-3.5 w-3.5 text-amber-500" />
                       <span>Language</span>
                     </label>
                     <select
                       value={selectedLanguage}
                       onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
                     >
                       {LANGUAGES.map((lang) => (
                         <option key={lang.code} value={lang.code}>
@@ -739,15 +760,87 @@ function WeatherHome() {
           </div>
         </div>
 
-        {/* 4. CURRENT WEATHER HERO CARD */}
+        {/* 4. DEDICATED AI WALLPAPER HERO CANVAS (Full, Unobstructed City Picture) */}
+        {activeWallpaperUrl && (
+          <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-card shadow-md">
+            <div className="relative h-60 sm:h-72 w-full overflow-hidden bg-muted">
+              <img
+                key={activeWallpaperUrl}
+                src={activeWallpaperUrl}
+                alt={`${place.name} watercolor landscape`}
+                className="h-full w-full object-cover transition-opacity duration-700 select-none"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/35 pointer-events-none" />
+
+              {/* Artwork quick action buttons (top right) */}
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleNextArtwork}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/45 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition hover:bg-black/65 cursor-pointer shadow-xs"
+                  title="Next Artwork"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Next Art</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudioCity(place.name);
+                    setGalleryOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/45 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition hover:bg-black/65 cursor-pointer shadow-xs"
+                  title="Open Gallery & Studio"
+                >
+                  <Palette className="h-3 w-3 text-amber-300" />
+                  <span>Gallery</span>
+                </button>
+              </div>
+
+              {/* Artwork Landmark Caption (bottom) */}
+              <div className="absolute bottom-3 left-4 right-4 z-10 flex items-end justify-between text-white pointer-events-none">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold tracking-tight drop-shadow-sm">
+                      {place.name}
+                    </span>
+                    {place.country && (
+                      <span className="text-xs text-white/80 font-medium">
+                        · {place.country}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-white/75 drop-shadow-xs">
+                    Hand-painted AI watercolor cityscape
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleToggleFavorite}
+                  className="pointer-events-auto p-2 rounded-full bg-black/45 border border-white/20 text-white hover:text-amber-400 transition cursor-pointer shadow-xs"
+                  title={isFav ? "Saved in Favorites" : "Add to Favorites"}
+                >
+                  <Heart
+                    className={`h-4 w-4 ${
+                      isFav ? "fill-amber-500 text-amber-500" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 5. CURRENT WEATHER CONDITIONS CARD (SEPARATE FROM AI WALLPAPER) */}
         {weather && (
-          <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-card/85 shadow-md backdrop-blur-md p-5 sm:p-6 space-y-4">
+          <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-card/90 shadow-md backdrop-blur-md p-5 sm:p-6 space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  Current Weather
+                  Current Conditions
                 </span>
-                <div className="flex items-baseline gap-2 mt-1">
+                <div className="flex items-baseline gap-2.5 mt-1">
                   <span className="text-5xl sm:text-6xl font-extrabold tracking-tight text-foreground">
                     {Math.round(weather.current.temp)}°
                   </span>
@@ -760,7 +853,7 @@ function WeatherHome() {
                 </p>
               </div>
 
-              <div className="p-2 rounded-2xl bg-amber-500/10 shrink-0">
+              <div className="p-2.5 rounded-2xl bg-amber-500/10 shrink-0">
                 <WeatherIcon
                   code={weather.current.code}
                   isDay={weather.current.isDay}
@@ -770,7 +863,7 @@ function WeatherHome() {
             </div>
 
             {/* Quick Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-border/60">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-border/60">
               <div className="rounded-xl border border-border/60 bg-muted/30 p-2.5">
                 <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                   <Droplets className="h-3 w-3 text-sky-500" /> Humidity
@@ -810,7 +903,7 @@ function WeatherHome() {
           </section>
         )}
 
-        {/* 5. HOURLY FORECAST */}
+        {/* 6. HOURLY FORECAST */}
         {weather && weather.hourly.length > 0 && (
           <section className="rounded-xl border border-border/70 bg-card/85 p-4 shadow-xs backdrop-blur-md">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
@@ -838,7 +931,7 @@ function WeatherHome() {
           </section>
         )}
 
-        {/* 6. 7-DAY FORECAST */}
+        {/* 7. 7-DAY FORECAST */}
         {weather && weather.daily.length > 0 && (
           <section className="rounded-xl border border-border/70 bg-card/85 p-4 shadow-xs backdrop-blur-md">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -873,7 +966,7 @@ function WeatherHome() {
           </section>
         )}
 
-        {/* 7. WHAT TO WEAR RECOMMENDATIONS */}
+        {/* 8. WHAT TO WEAR RECOMMENDATIONS */}
         <section className="rounded-xl border border-border/70 bg-card/85 p-4 shadow-xs backdrop-blur-md space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -1099,29 +1192,23 @@ function WeatherHome() {
 
       {/* Location Rationale Dialog */}
       {locationDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                <Compass className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-foreground">
-                  Use My Location
-                </h3>
-                <p className="text-xs text-muted-foreground">Private & On-Device</p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl space-y-3">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
+              <Compass className="h-5 w-5" />
+              <h3 className="text-sm font-bold text-foreground">
+                Location Permission
+              </h3>
             </div>
-
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              We only use your GPS coordinates locally in your browser to request accurate weather forecasts from Open-Meteo. No user tracking, no accounts, and no location data is stored on external servers.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              We request your GPS location only to fetch your immediate local
+              forecast. We do not store or track your coordinates anywhere.
             </p>
-
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setLocationDialogOpen(false)}
-                className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted transition cursor-pointer"
+                className="rounded-xl border border-border/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted transition cursor-pointer"
               >
                 Cancel
               </button>
