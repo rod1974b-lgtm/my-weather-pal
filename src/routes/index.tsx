@@ -1,24 +1,3 @@
-The page didn't load because of a runtime error: `getWeatherAlert` was passed a number (`weather.current.code`) instead of the `Weather` object, which caused React to throw:
-
-```
-TypeError: Cannot read properties of undefined (reading 'code')
-```
-
-In addition, several property names did not match this project's exact type definitions:
-* Coordinates: `city.lat` and `city.lon` (instead of `latitude`/`longitude`)
-* Alert property: `alertItem.message` (instead of `alertItem.headline`)
-* Wind speed: `weather.current.wind` (instead of `windSpeed`)
-* Unit values: `"metric"` and `"imperial"` (instead of `"us"`)
-* AQI label: `aqiCategory(...).label` (it returns an object `{ label, color }`)
-* Tier text: `tier.tagline || tier.thankYouText` (instead of `description`)
-
----
-
-Complete Drop-In Replacement for `src/routes/index.tsx`
-
-Copy and paste this entire file into `src/routes/index.tsx` in your GitHub repository and commit:
-
-```tsx
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useTransition, useRef } from "react";
 import {
@@ -1454,4 +1433,3 @@ function WeatherPage() {
     </div>
   );
 }
-```
