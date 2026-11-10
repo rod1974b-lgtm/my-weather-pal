@@ -1,3 +1,24 @@
+The page didn't load because of a runtime error: `getWeatherAlert` was passed a number (`weather.current.code`) instead of the `Weather` object, which caused React to throw:
+
+```
+TypeError: Cannot read properties of undefined (reading 'code')
+```
+
+In addition, several property names did not match this project's exact type definitions:
+* Coordinates: `city.lat` and `city.lon` (instead of `latitude`/`longitude`)
+* Alert property: `alertItem.message` (instead of `alertItem.headline`)
+* Wind speed: `weather.current.wind` (instead of `windSpeed`)
+* Unit values: `"metric"` and `"imperial"` (instead of `"us"`)
+* AQI label: `aqiCategory(...).label` (it returns an object `{ label, color }`)
+* Tier text: `tier.tagline || tier.thankYouText` (instead of `description`)
+
+---
+
+Complete Drop-In Replacement for `src/routes/index.tsx`
+
+Copy and paste this entire file into `src/routes/index.tsx` in your GitHub repository and commit:
+
+```tsx
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useTransition, useRef } from "react";
 import {
@@ -86,7 +107,7 @@ interface GalleryArtwork {
   name: string;
   url: string;
   city: string;
-  requiredTier?: string; // "free" | "small" | "medium" | "large" | "party"
+  requiredTier?: string;
 }
 
 const CURATED_ARTWORKS: GalleryArtwork[] = [
@@ -305,15 +326,14 @@ function WeatherPage() {
     const newPlace: Place = {
       name: city.name,
       country: city.country || "",
-      lat: city.latitude,
-      lon: city.longitude,
+      lat: city.lat,
+      lon: city.lon,
     };
     setPlace(newPlace);
     savePlace(newPlace);
     setSearchQuery("");
     setSearchResults([]);
 
-    // Check if we have curated artwork for this city
     const matched = CURATED_ARTWORKS.find(
       (a) => a.city.toLowerCase() === city.name.toLowerCase()
     );
@@ -408,7 +428,6 @@ function WeatherPage() {
   function handlePaintWatercolor() {
     setIsPainting(true);
     setTimeout(() => {
-      // Use uploaded reference or pick from landmarks
       const generatedUrl =
         studioImagePreview ||
         CURATED_ARTWORKS.find((a) => a.city.toLowerCase() === studioCity.toLowerCase())?.url ||
@@ -420,13 +439,15 @@ function WeatherPage() {
     }, 1200);
   }
 
-  const alertItem = weather ? getWeatherAlert(weather.current.code) : null;
+  const alertItem = weather ? getWeatherAlert(weather) : null;
   const isFav = isFavorite(place, favorites);
 
-  // Determine atmospheric gradient based on weather or sky preference
-  const effectiveSky = skyPref === "auto"
-    ? (weather ? skyKey(weather.current.code, weather.current.isDay) : "day")
-    : skyPref;
+  const effectiveSky =
+    skyPref === "auto"
+      ? weather
+        ? skyKey(weather.current.code, weather.current.isDay ? 1 : 0)
+        : "day"
+      : skyPref;
 
   const skyBackgroundClass =
     effectiveSky === "night" || effectiveSky === "Clear night"
@@ -440,7 +461,9 @@ function WeatherPage() {
       : "from-sky-400 via-sky-200 to-amber-50 text-slate-900";
 
   return (
-    <div className={`relative min-h-screen transition-colors duration-500 ${skyBackgroundClass} flex flex-col font-sans`}>
+    <div
+      className={`relative min-h-screen transition-colors duration-500 ${skyBackgroundClass} flex flex-col font-sans`}
+    >
       {/* FULL-APP WALLPAPER OVERLAY */}
       {activeBg && (
         <div
@@ -552,7 +575,7 @@ function WeatherPage() {
               <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden z-40 max-h-56 overflow-y-auto">
                 {searchResults.map((city) => (
                   <button
-                    key={`${city.latitude}-${city.longitude}-${city.name}`}
+                    key={`${city.lat}-${city.lon}-${city.name}`}
                     type="button"
                     onClick={() => handleSelectCity(city)}
                     className="w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-muted/70 flex items-center justify-between text-popover-foreground transition-colors border-b border-border/40 last:border-b-0 cursor-pointer"
@@ -562,7 +585,7 @@ function WeatherPage() {
                       {city.country ? `, ${city.country}` : ""}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                      {city.latitude.toFixed(2)}, {city.longitude.toFixed(2)}
+                      {city.lat.toFixed(2)}, {city.lon.toFixed(2)}
                     </span>
                   </button>
                 ))}
@@ -573,12 +596,12 @@ function WeatherPage() {
           {/* 3. WEATHER ALERT TICKER (DIRECTLY BELOW CITY SEARCH) */}
           {alertItem && (
             <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 backdrop-blur-md flex items-center gap-2.5 text-amber-950 dark:text-amber-100 shadow-xs animate-in fade-in">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+              <span className="text-base shrink-0">{alertItem.icon}</span>
               <div className="flex-1 text-xs leading-snug">
                 <span className="font-bold uppercase tracking-wider text-[10px] mr-1 px-1.5 py-0.5 rounded bg-amber-500/30">
                   {alertItem.severity}
                 </span>
-                <span className="font-medium">{alertItem.headline}</span>
+                <span className="font-medium">{alertItem.message}</span>
               </div>
             </div>
           )}
@@ -818,8 +841,8 @@ function WeatherPage() {
                         Wind Speed
                       </span>
                       <span className="font-bold text-foreground">
-                        {Math.round(weather.current.windSpeed)}{" "}
-                        {unit === "us" ? "mph" : "km/h"}
+                        {Math.round(weather.current.wind)}{" "}
+                        {unit === "imperial" ? "mph" : "km/h"}
                       </span>
                     </div>
                   </div>
@@ -848,7 +871,7 @@ function WeatherPage() {
                       <span className="font-bold text-foreground">
                         AQI {weather.current.aqi ?? "—"}{" "}
                         <span className="font-normal text-[10px] text-muted-foreground">
-                          ({aqiCategory(weather.current.aqi)})
+                          ({aqiCategory(weather.current.aqi ?? 0).label})
                         </span>
                       </span>
                     </div>
@@ -856,7 +879,7 @@ function WeatherPage() {
                 </div>
               </section>
 
-              {/* 6. HOURLY FORECAST WITH CONDITION TEXT */}
+              {/* 6. HOURLY FORECAST WITH VISIBLE CONDITION TEXT */}
               <section className="bg-card/85 backdrop-blur-md rounded-2xl p-4 border border-border/60 shadow-md space-y-2">
                 <div className="flex items-center justify-between pb-1">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -1063,9 +1086,9 @@ function WeatherPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleUnitChange("us")}
+                  onClick={() => handleUnitChange("imperial")}
                   className={`py-2 px-3 text-xs font-bold rounded-xl transition cursor-pointer text-center ${
-                    unit === "us"
+                    unit === "imperial"
                       ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs"
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
@@ -1301,7 +1324,7 @@ function WeatherPage() {
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground line-clamp-2">
-                        {tier.description}
+                        {tier.tagline || tier.thankYouText}
                       </p>
                     </div>
                   );
@@ -1348,7 +1371,7 @@ function WeatherPage() {
                       {tier.name}
                     </span>
                     <span className="text-[11px] text-muted-foreground block">
-                      {tier.description}
+                      {tier.tagline || tier.thankYouText}
                     </span>
                   </div>
 
@@ -1431,3 +1454,4 @@ function WeatherPage() {
     </div>
   );
 }
+```
