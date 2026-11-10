@@ -88,14 +88,66 @@ interface GalleryArtwork {
 }
 
 const CURATED_ARTWORKS: GalleryArtwork[] = [
-  { id: "bangkok_1", name: "Bangkok Sunny Grand Palace", url: "/backgrounds/vibrant/bangkok_sunny.jpg", city: "Bangkok", requiredTier: "free" },
-  { id: "bangkok_2", name: "Bangkok Riverside Temple", url: (LANDMARK_WATERCOLORS["bangkok"] || [])[1] || "/backgrounds/vibrant/bangkok_sunny.jpg", city: "Bangkok", requiredTier: "small" },
-  { id: "ratchaburi_1", name: "Ratchaburi Atmospheric Haze", url: "/backgrounds/vibrant/ratchaburi_haze.jpg", city: "Ratchaburi", requiredTier: "large" },
-  { id: "ratchaburi_2", name: "Ratchaburi Floating Market", url: (LANDMARK_WATERCOLORS["ratchaburi"] || [])[1] || "/backgrounds/vibrant/ratchaburi_haze.jpg", city: "Ratchaburi", requiredTier: "medium" },
-  { id: "kyoto_1", name: "Kyoto Golden Pagoda", url: "/backgrounds/vibrant/kyoto_sunny.jpg", city: "Kyoto", requiredTier: "free" },
-  { id: "skopje_1", name: "Skopje Rainy Watercolor", url: "/backgrounds/vibrant/rain_skopje.jpg", city: "Skopje", requiredTier: "small" },
-  { id: "swiss_1", name: "Swiss Alps Mountain Snow", url: "/backgrounds/vibrant/snow_swiss.jpg", city: "Swiss Alps", requiredTier: "medium" },
-  { id: "storm_1", name: "Dramatic Sky & Thunderstorm", url: "/backgrounds/vibrant/storm.jpg", city: "Atmosphere", requiredTier: "large" },
+  {
+    id: "bangkok_1",
+    name: "Bangkok Sunny Grand Palace",
+    url: "/backgrounds/vibrant/bangkok_sunny.jpg",
+    city: "Bangkok",
+    requiredTier: "free",
+  },
+  {
+    id: "bangkok_2",
+    name: "Bangkok Riverside Temple",
+    url:
+      (LANDMARK_WATERCOLORS["bangkok"] || [])[1] ||
+      "/backgrounds/vibrant/bangkok_sunny.jpg",
+    city: "Bangkok",
+    requiredTier: "small",
+  },
+  {
+    id: "ratchaburi_1",
+    name: "Ratchaburi Atmospheric Haze",
+    url: "/backgrounds/vibrant/ratchaburi_haze.jpg",
+    city: "Ratchaburi",
+    requiredTier: "large",
+  },
+  {
+    id: "ratchaburi_2",
+    name: "Ratchaburi Floating Market",
+    url:
+      (LANDMARK_WATERCOLORS["ratchaburi"] || [])[1] ||
+      "/backgrounds/vibrant/ratchaburi_haze.jpg",
+    city: "Ratchaburi",
+    requiredTier: "medium",
+  },
+  {
+    id: "kyoto_1",
+    name: "Kyoto Golden Pagoda",
+    url: "/backgrounds/vibrant/kyoto_sunny.jpg",
+    city: "Kyoto",
+    requiredTier: "free",
+  },
+  {
+    id: "skopje_1",
+    name: "Skopje Rainy Watercolor",
+    url: "/backgrounds/vibrant/rain_skopje.jpg",
+    city: "Skopje",
+    requiredTier: "small",
+  },
+  {
+    id: "swiss_1",
+    name: "Swiss Alps Mountain Snow",
+    url: "/backgrounds/vibrant/snow_swiss.jpg",
+    city: "Swiss Alps",
+    requiredTier: "medium",
+  },
+  {
+    id: "storm_1",
+    name: "Dramatic Sky & Thunderstorm",
+    url: "/backgrounds/vibrant/storm.jpg",
+    city: "Atmosphere",
+    requiredTier: "large",
+  },
 ];
 
 type WearCategory = "casual" | "business" | "sports";
@@ -124,7 +176,7 @@ export const Route = createFileRoute("/")({
 function WeatherPage() {
   const [place, setPlace] = useState<Place>(() => readSavedPlace() || DEFAULT_PLACE);
   const [unit, setUnit] = useState<WeatherUnit>(() => readUnit());
-  const [weather, setWeather] = useState<Weather | null>(() => readCachedWeather(place));
+  const [weather, setWeather] = useState<Weather | null>(() => readCachedWeather(place, unit));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,7 +207,7 @@ function WeatherPage() {
   const [adCountdown, setAdCountdown] = useState<number>(3);
 
   // Force re-render of unlock statuses
-  const [unlockVersion, setUnlockVersion] = useState(0);
+  const [, setUnlockVersion] = useState(0);
 
   useEffect(() => {
     setFavorites(loadFavorites());
@@ -166,7 +218,7 @@ function WeatherPage() {
     setLoading(true);
     setError(null);
 
-    fetchWeather(place.latitude, place.longitude, unit)
+    fetchWeather(place, unit)
       .then((data) => {
         if (!ignore) {
           setWeather(data);
@@ -205,8 +257,12 @@ function WeatherPage() {
       return;
     }
     startSearchTransition(async () => {
-      const res = await searchCities(q);
-      setSearchResults(res);
+      try {
+        const res = await searchCities(q);
+        setSearchResults(res);
+      } catch {
+        setSearchResults([]);
+      }
     });
   }
 
@@ -214,17 +270,18 @@ function WeatherPage() {
     const next: Place = {
       name: city.name,
       country: city.country,
-      latitude: city.latitude,
-      longitude: city.longitude,
+      lat: city.lat,
+      lon: city.lon,
     };
     setPlace(next);
     savePlace(next);
     setSearchQuery("");
     setSearchResults([]);
 
-    const matchArt = CURATED_ARTWORKS.find((a) =>
-      a.city.toLowerCase().includes(city.name.toLowerCase()) ||
-      city.name.toLowerCase().includes(a.city.toLowerCase())
+    const matchArt = CURATED_ARTWORKS.find(
+      (a) =>
+        a.city.toLowerCase().includes(city.name.toLowerCase()) ||
+        city.name.toLowerCase().includes(a.city.toLowerCase())
     );
     if (matchArt && isArtworkUnlocked(matchArt)) {
       handleSelectBg(matchArt.url);
@@ -232,13 +289,13 @@ function WeatherPage() {
   }
 
   function toggleUnit() {
-    const next: WeatherUnit = unit === "celsius" ? "fahrenheit" : "celsius";
+    const next: WeatherUnit = unit === "metric" ? "imperial" : "metric";
     setUnit(next);
     saveUnit(next);
   }
 
   function toggleFavorite() {
-    const exists = isFavorite(favorites, place);
+    const exists = isFavorite(place, favorites);
     let next: Place[];
     if (exists) {
       next = favorites.filter((p) => !isSamePlace(p, place));
@@ -258,12 +315,12 @@ function WeatherPage() {
 
     setLoading(true);
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const next: Place = {
           name: "Current Location",
           country: "",
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
         };
         setPlace(next);
         savePlace(next);
@@ -287,7 +344,10 @@ function WeatherPage() {
   // --- UNLOCK CHECKING HELPERS ---
   function isTierUnlocked(tierId: string): boolean {
     if (typeof window === "undefined") return false;
-    return isThankYouBackgroundUnlocked(tierId) || localStorage.getItem(`unlocked_tier_${tierId}`) === "true";
+    return (
+      isThankYouBackgroundUnlocked(tierId) ||
+      localStorage.getItem(`unlocked_tier_${tierId}`) === "true"
+    );
   }
 
   function isPartyPackUnlocked(): boolean {
@@ -299,10 +359,19 @@ function WeatherPage() {
     if (isPartyPackUnlocked()) return true;
     if (isAdUnlocked(art.id)) return true;
 
-    if (art.requiredTier === "small" && (isTierUnlocked("small_root_beer_tier") || isTierUnlocked("medium_root_beer_tier") || isTierUnlocked("large_root_beer_tier"))) {
+    if (
+      art.requiredTier === "small" &&
+      (isTierUnlocked("small_root_beer_tier") ||
+        isTierUnlocked("medium_root_beer_tier") ||
+        isTierUnlocked("large_root_beer_tier"))
+    ) {
       return true;
     }
-    if (art.requiredTier === "medium" && (isTierUnlocked("medium_root_beer_tier") || isTierUnlocked("large_root_beer_tier"))) {
+    if (
+      art.requiredTier === "medium" &&
+      (isTierUnlocked("medium_root_beer_tier") ||
+        isTierUnlocked("large_root_beer_tier"))
+    ) {
       return true;
     }
     if (art.requiredTier === "large" && isTierUnlocked("large_root_beer_tier")) {
@@ -332,7 +401,10 @@ function WeatherPage() {
 
   function getWearAdvice(): { text: string; accessories: string[] } {
     if (!weather) return { text: "Loading weather recommendation...", accessories: [] };
-    const tempC = weather.current.temperature;
+    const tempC =
+      weather.unit === "imperial"
+        ? ((weather.current.temperature - 32) * 5) / 9
+        : weather.current.temperature;
     const isRain = weather.current.code >= 51 && weather.current.code <= 67;
 
     let text = "";
@@ -359,15 +431,19 @@ function WeatherPage() {
     }
 
     if (isRain) accessories.push("Umbrella", "Waterproof shoes");
-    if (weather.current.uv_index >= 6) accessories.push("Sunglasses", "Sunscreen");
-    if (weather.current.wind_speed >= 25) accessories.push("Windbreaker");
+    if (weather.current.uvIndex >= 6) accessories.push("Sunglasses", "Sunscreen");
+    if (weather.current.wind >= (weather.unit === "imperial" ? 18 : 28)) {
+      accessories.push("Windbreaker");
+    }
 
     return { text, accessories };
   }
 
-  const alert = weather ? getWeatherAlert(weather.current.code, weather.current.wind_speed, weather.current.temperature) : null;
+  const alert = weather ? getWeatherAlert(weather) : null;
   const wear = getWearAdvice();
-  const currentSkyClass = weather ? `sky-${skyKey(weather.current.code, weather.current.is_day)}` : "sky-default";
+  const currentSkyClass = weather
+    ? `sky-${skyKey(weather.current.code, weather.current.isDay ? 1 : 0)}`
+    : "sky-default";
 
   return (
     <div className={`min-h-screen text-foreground pb-14 sky relative ${currentSkyClass}`}>
@@ -427,7 +503,7 @@ function WeatherPage() {
               onClick={toggleUnit}
               className="px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-muted/60 hover:bg-muted text-foreground transition-colors cursor-pointer"
             >
-              {unit === "celsius" ? "°C" : "°F"}
+              {unit === "metric" ? "°C" : "°F"}
             </button>
           </div>
         </header>
@@ -470,15 +546,14 @@ function WeatherPage() {
             <div className="absolute top-full left-0 right-0 mt-2 bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto divide-y divide-border">
               {searchResults.map((city) => (
                 <button
-                  key={`${city.name}-${city.latitude}-${city.longitude}`}
+                  key={`${city.name}-${city.lat}-${city.lon}`}
                   type="button"
                   onClick={() => handleSelectCity(city)}
                   className="w-full text-left px-4 py-2.5 hover:bg-muted/80 text-sm flex items-center justify-between cursor-pointer transition-colors"
                 >
                   <span className="font-medium text-foreground">{city.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    {city.admin1 ? `${city.admin1}, ` : ""}
-                    {city.country}
+                    {city.country || ""}
                   </span>
                 </button>
               ))}
@@ -489,15 +564,17 @@ function WeatherPage() {
         {/* 3. WEATHER ALERT TICKER (PLACED IMMEDIATELY BELOW CITY SEARCH) */}
         {alert ? (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-900 dark:text-amber-200 text-xs sm:text-sm font-medium shadow-xs animate-pulse">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="text-sm shrink-0">{alert.icon}</span>
             <div className="overflow-hidden whitespace-nowrap w-full">
-              <span className="inline-block animate-marquee">{alert}</span>
+              <span className="inline-block animate-marquee">{alert.message}</span>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/60 backdrop-blur-xs border border-border/40 text-muted-foreground text-xs">
             <Sun className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span className="truncate">No severe weather watches active in {place.name}. Calm conditions.</span>
+            <span className="truncate">
+              No severe weather watches active in {place.name}. Calm conditions.
+            </span>
           </div>
         )}
 
@@ -520,7 +597,9 @@ function WeatherPage() {
           {loading && !weather ? (
             <div className="h-64 rounded-2xl bg-card/70 backdrop-blur-md border border-border/60 flex flex-col items-center justify-center gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground">Painting live forecast for {place.name}...</p>
+              <p className="text-xs text-muted-foreground">
+                Painting live forecast for {place.name}...
+              </p>
             </div>
           ) : weather ? (
             <>
@@ -572,11 +651,15 @@ function WeatherPage() {
                       type="button"
                       onClick={toggleFavorite}
                       className="p-1 rounded-full hover:bg-muted text-muted-foreground cursor-pointer transition-colors"
-                      title={isFavorite(favorites, place) ? "Remove favorite" : "Save as favorite"}
+                      title={
+                        isFavorite(place, favorites)
+                          ? "Remove favorite"
+                          : "Save as favorite"
+                      }
                     >
                       <Heart
                         className={`w-4 h-4 ${
-                          isFavorite(favorites, place)
+                          isFavorite(place, favorites)
                             ? "fill-red-500 text-red-500"
                             : "hover:text-red-400"
                         }`}
@@ -585,7 +668,11 @@ function WeatherPage() {
                   </div>
 
                   <span className="text-xs text-muted-foreground">
-                    Updated {weather.current.time.slice(11, 16) || "Just now"}
+                    Updated{" "}
+                    {new Date(weather.fetchedAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
                 </div>
 
@@ -596,26 +683,33 @@ function WeatherPage() {
                         {Math.round(weather.current.temperature)}°
                       </span>
                       <span className="text-lg font-semibold text-muted-foreground">
-                        {unit === "celsius" ? "C" : "F"}
+                        {unit === "metric" ? "C" : "F"}
                       </span>
                     </div>
 
                     <p className="text-base sm:text-lg font-bold text-foreground capitalize">
-                      {describeWeather(weather.current.code)}
+                      {weather.current.condition ||
+                        describeWeather(weather.current.code).label}
                     </p>
 
                     <p className="text-xs text-muted-foreground">
-                      Feels like {Math.round(weather.current.apparent_temperature)}° • High{" "}
-                      {Math.round(weather.daily[0]?.high ?? weather.current.temperature)}° / Low{" "}
-                      {Math.round(weather.daily[0]?.low ?? weather.current.temperature)}°
+                      Feels like {Math.round(weather.current.feelsLike)}° • High{" "}
+                      {Math.round(
+                        weather.daily[0]?.high ?? weather.current.temperature
+                      )}
+                      ° / Low{" "}
+                      {Math.round(
+                        weather.daily[0]?.low ?? weather.current.temperature
+                      )}
+                      °
                     </p>
                   </div>
 
                   <div className="shrink-0 flex flex-col items-center">
                     <WeatherIcon
                       code={weather.current.code}
-                      isDay={weather.current.is_day === 1}
-                      size={92}
+                      isDay={weather.current.isDay}
+                      className="size-20"
                     />
                   </div>
                 </div>
@@ -625,9 +719,11 @@ function WeatherPage() {
                   <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
                     <Droplets className="w-4 h-4 text-blue-500 shrink-0" />
                     <div>
-                      <span className="text-[10px] text-muted-foreground block">Humidity</span>
+                      <span className="text-[10px] text-muted-foreground block">
+                        Humidity
+                      </span>
                       <span className="text-xs font-bold text-foreground">
-                        {weather.current.relative_humidity}%
+                        {weather.current.humidity}%
                       </span>
                     </div>
                   </div>
@@ -635,9 +731,12 @@ function WeatherPage() {
                   <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
                     <Wind className="w-4 h-4 text-teal-500 shrink-0" />
                     <div>
-                      <span className="text-[10px] text-muted-foreground block">Wind</span>
+                      <span className="text-[10px] text-muted-foreground block">
+                        Wind
+                      </span>
                       <span className="text-xs font-bold text-foreground">
-                        {Math.round(weather.current.wind_speed)} {unit === "celsius" ? "km/h" : "mph"}
+                        {Math.round(weather.current.wind)}{" "}
+                        {unit === "metric" ? "km/h" : "mph"}
                       </span>
                     </div>
                   </div>
@@ -645,22 +744,30 @@ function WeatherPage() {
                   <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
                     <Sun className="w-4 h-4 text-amber-500 shrink-0" />
                     <div>
-                      <span className="text-[10px] text-muted-foreground block">UV Index</span>
+                      <span className="text-[10px] text-muted-foreground block">
+                        UV Index
+                      </span>
                       <span className="text-xs font-bold text-foreground">
-                        {weather.current.uv_index.toFixed(1)} ({uvCategory(weather.current.uv_index)})
+                        {weather.current.uvIndex.toFixed(1)} (
+                        {uvCategory(weather.current.uvIndex)})
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
-                    <Compass className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <div>
-                      <span className="text-[10px] text-muted-foreground block">Air Quality</span>
-                      <span className="text-xs font-bold text-foreground">
-                        {weather.current.us_aqi} AQI ({aqiCategory(weather.current.us_aqi)})
-                      </span>
+                  {weather.current.aqi !== undefined && (
+                    <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
+                      <Compass className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block">
+                          Air Quality
+                        </span>
+                        <span className="text-xs font-bold text-foreground">
+                          {weather.current.aqi} AQI (
+                          {aqiCategory(weather.current.aqi).label})
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </section>
 
@@ -670,7 +777,9 @@ function WeatherPage() {
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Hourly Forecast (Today)
                   </h3>
-                  <span className="text-xs text-muted-foreground">24-Hour Timeline</span>
+                  <span className="text-xs text-muted-foreground">
+                    24-Hour Timeline
+                  </span>
                 </div>
 
                 <div className="flex gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
@@ -680,15 +789,21 @@ function WeatherPage() {
                       className="flex flex-col items-center min-w-[3.75rem] p-2.5 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/40 shrink-0 text-center space-y-1 transition-colors"
                     >
                       <span className="text-[11px] font-medium text-muted-foreground">
-                        {idx === 0 ? "Now" : formatForecastTime(h.time)}
+                        {idx === 0
+                          ? "Now"
+                          : formatForecastTime(h.time, weather.timezone)}
                       </span>
-                      <WeatherIcon code={h.code} isDay={h.is_day === 1} size={32} />
+                      <WeatherIcon
+                        code={h.code}
+                        isDay={h.isDay}
+                        className="size-8"
+                      />
                       <span className="text-xs font-bold text-foreground">
                         {Math.round(h.temperature)}°
                       </span>
-                      {h.precipitation_probability > 0 && (
+                      {h.precipProb > 0 && (
                         <span className="text-[10px] text-blue-500 font-semibold">
-                          {h.precipitation_probability}%
+                          {h.precipProb}%
                         </span>
                       )}
                     </div>
@@ -709,13 +824,15 @@ function WeatherPage() {
                       className="py-2.5 flex items-center justify-between text-sm hover:bg-muted/30 px-2 rounded-lg transition-colors"
                     >
                       <span className="w-24 font-medium text-foreground">
-                        {idx === 0 ? "Today" : formatForecastDay(d.date)}
+                        {idx === 0
+                          ? "Today"
+                          : formatForecastDay(d.date, weather.timezone)}
                       </span>
 
                       <div className="flex items-center gap-2">
-                        <WeatherIcon code={d.code} isDay={true} size={28} />
+                        <WeatherIcon code={d.code} isDay={true} className="size-7" />
                         <span className="text-xs text-muted-foreground capitalize hidden sm:inline">
-                          {describeWeather(d.code)}
+                          {describeWeather(d.code).label}
                         </span>
                       </div>
 
@@ -743,28 +860,34 @@ function WeatherPage() {
                   </div>
 
                   <div className="flex items-center p-0.5 rounded-lg bg-muted/60 border border-border/60 text-xs font-semibold">
-                    {(["casual", "business", "sports"] as WearCategory[]).map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setWearCategory(cat)}
-                        className={`px-2 py-0.5 rounded-md capitalize cursor-pointer transition-colors ${
-                          wearCategory === cat
-                            ? "bg-card text-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                    {(["casual", "business", "sports"] as WearCategory[]).map(
+                      (cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setWearCategory(cat)}
+                          className={`px-2 py-0.5 rounded-md capitalize cursor-pointer transition-colors ${
+                            wearCategory === cat
+                              ? "bg-card text-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      )
+                    )}
                   </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-muted/30 border border-border/40 space-y-2">
-                  <p className="text-xs sm:text-sm text-foreground leading-relaxed">{wear.text}</p>
+                  <p className="text-xs sm:text-sm text-foreground leading-relaxed">
+                    {wear.text}
+                  </p>
                   {wear.accessories.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-[11px] font-bold text-muted-foreground">Pack:</span>
+                      <span className="text-[11px] font-bold text-muted-foreground">
+                        Pack:
+                      </span>
                       {wear.accessories.map((acc) => (
                         <span
                           key={acc}
@@ -889,7 +1012,9 @@ function WeatherPage() {
                     <Beer className="w-4 h-4" />
                     <span>Root Beer Supporter Tiers</span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground">Unlock permanently</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Unlock permanently
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -906,10 +1031,16 @@ function WeatherPage() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-foreground flex items-center gap-1.5">
-                            {unlocked ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
+                            {unlocked ? (
+                              <Check className="w-3.5 h-3.5 text-green-500" />
+                            ) : (
+                              <Lock className="w-3.5 h-3.5 text-amber-500" />
+                            )}
                             {tier.name}
                           </span>
-                          <span className="font-extrabold text-foreground">{tier.displayPrice}</span>
+                          <span className="font-extrabold text-foreground">
+                            {tier.displayPrice}
+                          </span>
                         </div>
 
                         <p className="text-[11px] leading-tight line-clamp-2">
@@ -948,7 +1079,9 @@ function WeatherPage() {
                     <Sparkles className="w-4 h-4 text-primary" />
                     <span>City Artworks & Wallpapers</span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground">Select to set wallpaper</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Select to set wallpaper
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -993,7 +1126,7 @@ function WeatherPage() {
 
                           {isSelected && (
                             <div className="absolute top-2 right-2 bg-primary text-primary-foreground p-1 rounded-full shadow-md">
-                              <Check className="w-3 h-3" />
+                              <Check className="w-3.5 h-3.5" />
                             </div>
                           )}
 
@@ -1001,7 +1134,9 @@ function WeatherPage() {
                           {!unlocked && (
                             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-2 text-center gap-1.5">
                               <span className="text-[10px] text-white font-semibold">
-                                {art.requiredTier ? `${art.requiredTier.toUpperCase()} Tier` : "Locked Slot"}
+                                {art.requiredTier
+                                  ? `${art.requiredTier.toUpperCase()} Tier`
+                                  : "Locked Slot"}
                               </span>
 
                               <button
@@ -1097,7 +1232,9 @@ function WeatherPage() {
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <div className="flex items-center gap-2">
                 <Beer className="w-5 h-5 text-amber-500" />
-                <span className="font-bold text-sm text-foreground">Support My Weather Pal</span>
+                <span className="font-bold text-sm text-foreground">
+                  Support My Weather Pal
+                </span>
               </div>
               <button
                 type="button"
