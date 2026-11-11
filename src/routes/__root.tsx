@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { setupOfflineSupport } from "../lib/pwa-registration";
+import "../lib/i18n";
 
 function NotFoundComponent() {
   return (
@@ -115,11 +116,12 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { void setupOfflineSupport(); }, []);
+  useEffect(() => {
+    void setupOfflineSupport();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
   );
