@@ -59,6 +59,7 @@ import {
   LANDMARK_WATERCOLORS,
   WEATHER_WATERCOLORS,
 } from "@/lib/aiWatercolorGenerator";
+import { generateWatercolorFn } from "@/lib/aiWatercolor.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -150,6 +151,15 @@ function WeatherHome() {
 
   // Wallpaper Art
   const [activeWallpaperUrl, setActiveWallpaperUrl] = useState<string | null>(null);
+  const [customArtworks, setCustomArtworks] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("weather:generated-artworks");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Ad & Root Beer Unlock Modal state
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
@@ -177,6 +187,7 @@ function WeatherHome() {
   const [studioScene, setStudioScene] = useState("");
   const [studioUploadedPhoto, setStudioUploadedPhoto] = useState<string | null>(null);
   const [studioPainting, setStudioPainting] = useState(false);
+  const [studioError, setStudioError] = useState<string | null>(null);
 
   // Apply font scale
   useEffect(() => {
@@ -238,7 +249,7 @@ function WeatherHome() {
     if (cityArts && cityArts.length > 0) {
       setActiveWallpaperUrl(cityArts[0]);
     } else if (weather) {
-      const key = skyKey(weather.current.code, weather.current.is_day);
+      const key = skyKey(weather.current.code, weather.current.isDay ? 1 : 0);
       const cat = key.includes("rain")
         ? "rain"
         : key.includes("snow")
@@ -413,12 +424,15 @@ function WeatherHome() {
   const alertItem = weather ? getWeatherAlert(weather) : null;
   const isFav = isPlaceInList(place, favorites);
 
-  // Artwork list for AI Gallery & Next Art cycling
+  // Artwork list for AI Gallery & Next Art cycling (custom generated art takes priority)
   const cityKey = place.name.toLowerCase().trim();
-  const availableArtworks = (cityKey && LANDMARK_WATERCOLORS[cityKey]) || [
-    ...WEATHER_WATERCOLORS.clear,
-    ...WEATHER_WATERCOLORS.clouds,
-    ...WEATHER_WATERCOLORS.rain,
+  const availableArtworks = [
+    ...customArtworks,
+    ...((cityKey && LANDMARK_WATERCOLORS[cityKey]) || [
+      ...WEATHER_WATERCOLORS.clear,
+      ...WEATHER_WATERCOLORS.clouds,
+      ...WEATHER_WATERCOLORS.rain,
+    ]),
   ];
 
   // Cycling artwork: slot 0 is free; slots 1+ require an ad or supporter tier
@@ -1254,49 +1268,101 @@ function WeatherHome() {
                 />
               </div>
 
-              {/* Photo Upload Simulation */}
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 cursor-pointer hover:underline">
-                  <Camera className="h-3.5 w-3.5" />
-                  <span>{studioUploadedPhoto ? "Photo selected" : "Upload reference photo"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const url = URL.createObjectURL(file);
-                        setStudioUploadedPhoto(url);
-                      }
-                    }}
-                  />
-                </label>
+              {/* Photo Upload & AI Paint Action */}
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 cursor-pointer hover:underline">
+                    <Camera className="h-3.5 w-3.5" />
+                    <span>{studioUploadedPhoto ? "Photo selected" : "Upload reference photo"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const url = URL.createObjectURL(file);
+                          setStudioUploadedPhoto(url);
+                        }
+                      }}
+                    />
+                  </label>
 
-                <button
-                  type="button"
-                  disabled={studioPainting}
-                  onClick={() => {
-                    setStudioPainting(true);
-                    setTimeout(() => {
-                      setStudioPainting(false);
+                  <button
+                    type="button"
+                    disabled={studioPainting}
+                    onClick={async () => {
                       if (studioUploadedPhoto) {
                         setActiveWallpaperUrl(studioUploadedPhoto);
-                      } else {
-                        const nextArt =
-                          availableArtworks[
-                            Math.floor(Math.random() * availableArtworks.length)
-                          ];
-                        setActiveWallpaperUrl(nextArt);
+                        setCustomArtworks((prev) => {
+                          const updated = [studioUploadedPhoto, ...prev.filter((p) => p !== studioUploadedPhoto)];
+                          try {
+                            localStorage.setItem("weather:generated-artworks", JSON.stringify(updated.slice(0, 10)));
+                          } catch {}
+                          return updated;
+                        });
+                        setGalleryOpen(false);
+                        return;
                       }
-                      setGalleryOpen(false);
-                    }, 800);
-                  }}
-                  className="flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition cursor-pointer disabled:opacity-60"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>{studioPainting ? "Painting..." : "Paint Watercolor"}</span>
-                </button>
+
+                      setStudioPainting(true);
+                      setStudioError(null);
+
+                      try {
+                        const targetCity = studioCity.trim() || place.name;
+                        const targetScene = studioScene.trim() || "Vibrant landmark scenery in atmospheric watercolor";
+                        const weatherMood = weather
+                          ? describeWeather(weather.current.code).label
+                          : undefined;
+
+                        const res = await generateWatercolorFn({
+                          data: {
+                            city: targetCity,
+                            userPrompt: targetScene,
+                            weatherDesc: weatherMood,
+                          },
+                        });
+
+                        if (res?.imageUrl) {
+                          setActiveWallpaperUrl(res.imageUrl);
+                          setCustomArtworks((prev) => {
+                            const updated = [res.imageUrl, ...prev.filter((p) => p !== res.imageUrl)];
+                            try {
+                              localStorage.setItem("weather:generated-artworks", JSON.stringify(updated.slice(0, 10)));
+                            } catch {}
+                            return updated;
+                          });
+                          setGalleryOpen(false);
+                        } else {
+                          setStudioError("No image was returned from the model.");
+                        }
+                      } catch (err: any) {
+                        setStudioError(err?.message || "AI image generation failed. Please try again.");
+                      } finally {
+                        setStudioPainting(false);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition cursor-pointer disabled:opacity-60"
+                  >
+                    {studioPainting ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Painting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>Paint Watercolor</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {studioError && (
+                  <p className="text-[11px] text-destructive bg-destructive/10 p-2 rounded-lg">
+                    {studioError}
+                  </p>
+                )}
               </div>
             </div>
 
