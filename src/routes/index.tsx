@@ -22,6 +22,8 @@ import {
   Camera,
   Lock,
   Check,
+  Download,
+  Trash2,
 } from "lucide-react";
 import {
   type Place,
@@ -75,6 +77,39 @@ interface ArtworkSlot {
   url: string;
   description: string;
   isUnlockedDefault: boolean;
+  isAiGenerated?: boolean;
+}
+
+const SAVED_AI_ARTWORKS_KEY = "weather:saved_ai_artworks";
+
+function loadSavedAiArtworks(): ArtworkSlot[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SAVED_AI_ARTWORKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistAiArtwork(art: ArtworkSlot) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = loadSavedAiArtworks();
+    const updated = [art, ...existing.filter((a) => a.id !== art.id)];
+    localStorage.setItem(SAVED_AI_ARTWORKS_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error("Failed to save artwork:", err);
+  }
+}
+
+function removeSavedAiArtwork(id: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = loadSavedAiArtworks();
+    const updated = existing.filter((a) => a.id !== id);
+    localStorage.setItem(SAVED_AI_ARTWORKS_KEY, JSON.stringify(updated));
+  } catch {}
 }
 
 const LANDMARK_WATERCOLORS: ArtworkSlot[] = [
@@ -219,15 +254,23 @@ function WeatherApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryTab, setGalleryTab] = useState<"all" | "saved">("all");
 
-  const [availableArtworks, setAvailableArtworks] = useState<ArtworkSlot[]>(LANDMARK_WATERCOLORS);
-  const [activeWallpaper, setActiveWallpaper] = useState<ArtworkSlot>(LANDMARK_WATERCOLORS[0]);
+  const [availableArtworks, setAvailableArtworks] = useState<ArtworkSlot[]>(() => {
+    const saved = loadSavedAiArtworks();
+    return [...saved, ...LANDMARK_WATERCOLORS];
+  });
+  const [activeWallpaper, setActiveWallpaper] = useState<ArtworkSlot>(() => {
+    const saved = loadSavedAiArtworks();
+    return saved[0] || LANDMARK_WATERCOLORS[0];
+  });
 
   const [creatorCity, setCreatorCity] = useState("");
   const [creatorPrompt, setCreatorPrompt] = useState("");
   const [creatorImagePreview, setCreatorImagePreview] = useState<string | null>(null);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [creatorError, setCreatorError] = useState<string | null>(null);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   const [pendingUnlockTarget, setPendingUnlockTarget] = useState<ArtworkSlot | null>(null);
   const [watchingAd, setWatchingAd] = useState(false);
@@ -345,7 +388,7 @@ function WeatherApp() {
   };
 
   const isSlotUnlocked = (slot: ArtworkSlot) => {
-    if (slot.isUnlockedDefault) return true;
+    if (slot.isUnlockedDefault || slot.isAiGenerated) return true;
     if (isAdUnlocked(slot.id)) return true;
     if (isThankYouBackgroundUnlocked(slot.id)) return true;
     return false;
@@ -391,6 +434,49 @@ function WeatherApp() {
     }, 1000);
   };
 
+  const handleDownloadWallpaper = async (art: ArtworkSlot) => {
+    try {
+      const cleanCity = (art.cityName || "wallpaper").toLowerCase().replace(/[^a-z0-9]/g, "_");
+      const filename = `${cleanCity}_ai_watercolor_${Date.now()}.png`;
+
+      if (art.url.startsWith("data:") || art.url.startsWith("blob:")) {
+        const link = document.createElement("a");
+        link.href = art.url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setDownloadSuccess(true);
+        setTimeout(() => setDownloadSuccess(false), 2500);
+        return;
+      }
+
+      const response = await fetch(art.url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2500);
+    } catch {
+      window.open(art.url, "_blank");
+    }
+  };
+
+  const handleDeleteSavedArtwork = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeSavedAiArtwork(id);
+    setAvailableArtworks((prev) => prev.filter((a) => a.id !== id));
+    if (activeWallpaper.id === id) {
+      setActiveWallpaper(LANDMARK_WATERCOLORS[0]);
+    }
+  };
+
   const handleGenerateAiWatercolor = async () => {
     if (!creatorCity.trim() || !creatorPrompt.trim()) {
       setCreatorError("Please enter both a city name and a scene description.");
@@ -415,8 +501,10 @@ function WeatherApp() {
         url: res.imageUrl,
         description: res.prompt || creatorPrompt.trim(),
         isUnlockedDefault: true,
+        isAiGenerated: true,
       };
 
+      persistAiArtwork(newArt);
       setAvailableArtworks((prev: ArtworkSlot[]) => [newArt, ...prev]);
       setActiveWallpaper(newArt);
       setCreatorPrompt("");
@@ -431,7 +519,9 @@ function WeatherApp() {
           url: creatorImagePreview,
           description: creatorPrompt.trim() || "Uploaded landmark reference",
           isUnlockedDefault: true,
+          isAiGenerated: true,
         };
+        persistAiArtwork(fallbackArt);
         setAvailableArtworks((prev: ArtworkSlot[]) => [fallbackArt, ...prev]);
         setActiveWallpaper(fallbackArt);
       }
@@ -499,6 +589,9 @@ function WeatherApp() {
   };
 
   const todayDaily = weather?.daily[0];
+  const displayedGalleryArt = galleryTab === "saved"
+    ? availableArtworks.filter((a) => a.isAiGenerated)
+    : availableArtworks;
 
   return (
     <div
@@ -736,7 +829,7 @@ function WeatherApp() {
           </div>
         </header>
 
-        {/* 1. CITY SEARCH (Top Priority) */}
+        {/* 1. CITY SEARCH */}
         <div className="relative z-20">
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
@@ -787,7 +880,7 @@ function WeatherApp() {
           )}
         </div>
 
-        {/* 2. WEATHER ALERT TICKER (Directly below city search) */}
+        {/* 2. WEATHER ALERT TICKER */}
         <div className="flex items-center gap-2 rounded-2xl border border-border/80 bg-card/85 px-3 py-2 text-xs shadow-xs backdrop-blur-md">
           <span className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
           <span className="font-bold text-foreground shrink-0">{t("alerts", "Weather Alerts")}:</span>
@@ -827,7 +920,7 @@ function WeatherApp() {
           </div>
         )}
 
-        {/* 3. DEDICATED FULL-SIZE AI WALLPAPER / ARTWORK CANVAS */}
+        {/* 3. DEDICATED FULL-SIZE AI WALLPAPER / ARTWORK CANVAS WITH DOWNLOAD */}
         <div className="overflow-hidden rounded-3xl border border-border/80 bg-card/85 shadow-lg backdrop-blur-md transition-all">
           <div className="relative aspect-16/9 w-full overflow-hidden bg-muted/40">
             <img
@@ -844,6 +937,26 @@ function WeatherApp() {
                 <span>{t("ai_scene", "AI Watercolor")}</span>
               </div>
               <div className="flex items-center gap-1.5">
+                {/* Download Button */}
+                <button
+                  type="button"
+                  onClick={() => handleDownloadWallpaper(activeWallpaper)}
+                  className="flex items-center gap-1 rounded-full bg-black/40 px-2.5 py-1 text-xs font-medium backdrop-blur-md border border-white/10 hover:bg-black/60 transition cursor-pointer"
+                  title="Download Wallpaper Image"
+                >
+                  {downloadSuccess ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-emerald-300 font-bold">Saved!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Save</span>
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={handleNextArtwork}
@@ -865,9 +978,16 @@ function WeatherApp() {
             {/* Bottom Caption inside Canvas */}
             <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between text-white">
               <div className="max-w-[75%] space-y-0.5">
-                <p className="text-xs font-bold tracking-tight text-white drop-shadow-sm">
-                  {activeWallpaper.cityName}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-bold tracking-tight text-white drop-shadow-sm">
+                    {activeWallpaper.cityName}
+                  </p>
+                  {activeWallpaper.isAiGenerated && (
+                    <span className="rounded-full bg-amber-500/80 px-1.5 py-0.2 text-[9px] font-bold text-white shadow-xs">
+                      AI Saved
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-white/80 line-clamp-1 drop-shadow-sm">
                   {activeWallpaper.description}
                 </p>
@@ -987,7 +1107,7 @@ function WeatherApp() {
           </div>
         )}
 
-        {/* 5. HOURLY FORECAST (With Condition Text & Icon) */}
+        {/* 5. HOURLY FORECAST */}
         {weather && weather.hourly.length > 0 && (
           <div className="rounded-3xl border border-border/80 bg-card/85 p-4 shadow-lg backdrop-blur-md space-y-3">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -1022,7 +1142,7 @@ function WeatherApp() {
           </div>
         )}
 
-        {/* 6. 7-DAY OUTLOOK (With Condition Text & Icon) */}
+        {/* 6. 7-DAY OUTLOOK */}
         {weather && weather.daily.length > 0 && (
           <div className="rounded-3xl border border-border/80 bg-card/85 p-4 shadow-lg backdrop-blur-md space-y-2.5">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -1174,7 +1294,7 @@ function WeatherApp() {
               {generatingAi ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Painting Watercolor with AI...</span>
+                  <span>Painting & Saving Watercolor...</span>
                 </>
               ) : (
                 <>
@@ -1205,7 +1325,7 @@ function WeatherApp() {
         </footer>
       </div>
 
-      {/* GALLERY MODAL */}
+      {/* GALLERY MODAL WITH TABS & ACTIONS */}
       {galleryOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1217,48 +1337,100 @@ function WeatherApp() {
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
-                className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+                className="rounded-full p-1 text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
+            {/* Gallery Tabs: All vs Saved AI */}
+            <div className="flex items-center gap-1 rounded-2xl bg-muted/60 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setGalleryTab("all")}
+                className={`flex-1 rounded-xl py-1.5 text-center font-bold transition cursor-pointer ${
+                  galleryTab === "all" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t("tab_curated", "Curated Landmarks")} ({availableArtworks.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGalleryTab("saved")}
+                className={`flex-1 rounded-xl py-1.5 text-center font-bold transition cursor-pointer ${
+                  galleryTab === "saved" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t("tab_saved", "Saved & Created")} ({availableArtworks.filter((a) => a.isAiGenerated).length})
+              </button>
+            </div>
+
             {/* Gallery Grid */}
             <div className="grid grid-cols-2 gap-3">
-              {availableArtworks.map((art: ArtworkSlot) => {
-                const unlocked = isSlotUnlocked(art);
-                const isActive = activeWallpaper.id === art.id;
-                return (
-                  <button
-                    key={art.id}
-                    type="button"
-                    onClick={() => handleSelectWallpaper(art)}
-                    className={`group relative overflow-hidden rounded-2xl border text-left transition cursor-pointer ${
-                      isActive ? "border-amber-500 ring-2 ring-amber-500/40" : "border-border/80 hover:border-amber-500/50"
-                    }`}
-                  >
-                    <div className="aspect-16/10 w-full overflow-hidden bg-muted">
-                      <img
-                        src={art.url}
-                        alt={art.description}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                      />
-                    </div>
-                    <div className="p-2 space-y-0.5 bg-card/90">
-                      <div className="flex items-center justify-between text-xs font-bold text-foreground">
-                        <span>{art.cityName}</span>
-                        {!unlocked && <Lock className="h-3 w-3 text-amber-500" />}
-                        {isActive && (
-                          <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[9px] font-bold text-amber-700 dark:text-amber-300">
-                            {t("gallery_active_badge", "Active")}
-                          </span>
-                        )}
+              {displayedGalleryArt.length === 0 ? (
+                <div className="col-span-2 py-8 text-center text-xs text-muted-foreground space-y-1">
+                  <p className="font-semibold">No saved AI artwork yet.</p>
+                  <p>Use the AI Watercolor studio to generate and save custom landmarks!</p>
+                </div>
+              ) : (
+                displayedGalleryArt.map((art: ArtworkSlot) => {
+                  const unlocked = isSlotUnlocked(art);
+                  const isActive = activeWallpaper.id === art.id;
+                  return (
+                    <div
+                      key={art.id}
+                      onClick={() => handleSelectWallpaper(art)}
+                      className={`group relative overflow-hidden rounded-2xl border text-left transition cursor-pointer ${
+                        isActive ? "border-amber-500 ring-2 ring-amber-500/40" : "border-border/80 hover:border-amber-500/50"
+                      }`}
+                    >
+                      <div className="aspect-16/10 w-full overflow-hidden bg-muted relative">
+                        <img
+                          src={art.url}
+                          alt={art.description}
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        />
+                        {/* Quick action buttons on card */}
+                        <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadWallpaper(art);
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md hover:bg-black/90 transition cursor-pointer"
+                            title="Download image"
+                          >
+                            <Download className="h-3 w-3" />
+                          </button>
+                          {art.isAiGenerated && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteSavedArtwork(art.id, e)}
+                              className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600/80 text-white backdrop-blur-md hover:bg-rose-600 transition cursor-pointer"
+                              title="Delete saved art"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[10px] text-muted-foreground line-clamp-1">{art.description}</p>
+                      <div className="p-2 space-y-0.5 bg-card/90">
+                        <div className="flex items-center justify-between text-xs font-bold text-foreground">
+                          <span className="truncate pr-1">{art.cityName}</span>
+                          {!unlocked && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
+                          {isActive && (
+                            <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[9px] font-bold text-amber-700 dark:text-amber-300 shrink-0">
+                              {t("gallery_active_badge", "Active")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">{art.description}</p>
+                      </div>
                     </div>
-                  </button>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* Supporter Banner inside Gallery */}
