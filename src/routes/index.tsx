@@ -31,7 +31,6 @@ import {
   type WeatherUnit,
   type CityResult,
   fetchWeather,
-  searchCities,
   DEFAULT_PLACE,
   formatForecastDay,
   formatForecastTime,
@@ -160,6 +159,229 @@ const LANGUAGES = [
   { code: "hi", flag: "🇮🇳", label: "हिन्दी (Hindi)" },
 ];
 
+/* Multilingual City Names */
+const CITIES: Record<string, Record<string, string>> = {
+  Bangkok: {
+    en: "Bangkok",
+    th: "กรุงเทพมหานคร",
+    es: "Bangkok",
+    ja: "バンコク",
+    zh: "曼谷",
+    fr: "Bangkok",
+    de: "Bangkok",
+    pt: "Banguecoque",
+    ru: "Бангкок",
+    ar: "بانكوك",
+    ko: "방콕",
+    id: "Bangkok",
+    vi: "Băng Cốc",
+    hi: "बैंकॉक",
+  },
+  Zurich: {
+    en: "Zurich",
+    th: "ซูริก",
+    es: "Zúrich",
+    ja: "チューリッヒ",
+    zh: "苏黎世",
+    fr: "Zurich",
+    de: "Zürich",
+    pt: "Zurique",
+    ru: "Цюрих",
+    ar: "زيورخ",
+    ko: "취리히",
+    id: "Zurich",
+    vi: "Zurich",
+    hi: "ज़्यूरिख़",
+  },
+  Bern: {
+    en: "Bern",
+    th: "แบร์น",
+    es: "Berna",
+    ja: "ベルン",
+    zh: "伯尔尼",
+    fr: "Berne",
+    de: "Bern",
+    pt: "Berna",
+    ru: "Берн",
+    ar: "برن",
+    ko: "베른",
+    id: "Bern",
+    vi: "Bern",
+    hi: "बर्न",
+  },
+  Tokyo: {
+    en: "Tokyo",
+    th: "โตเกียว",
+    es: "Tokio",
+    ja: "東京",
+    zh: "东京",
+    fr: "Tokyo",
+    de: "Tokio",
+    pt: "Tóquio",
+    ru: "Токио",
+    ar: "طوكيو",
+    ko: "도쿄",
+    id: "Tokyo",
+    vi: "Tokyo",
+    hi: "टोक्यो",
+  },
+  London: {
+    en: "London",
+    th: "ลอนดอน",
+    es: "Londres",
+    ja: "ロンドン",
+    zh: "伦敦",
+    fr: "Londres",
+    de: "London",
+    pt: "Londres",
+    ru: "Лондон",
+    ar: "لندن",
+    ko: "런던",
+    id: "London",
+    vi: "Luân Đôn",
+    hi: "लंदन",
+  },
+  Paris: {
+    en: "Paris",
+    th: "ปารีส",
+    es: "París",
+    ja: "パリ",
+    zh: "巴黎",
+    fr: "Paris",
+    de: "Paris",
+    pt: "Paris",
+    ru: "Париж",
+    ar: "باريس",
+    ko: "파리",
+    id: "Paris",
+    vi: "Paris",
+    hi: "पेरिस",
+  },
+};
+
+/* Multilingual Artwork Descriptions */
+const ARTWORK_DESCRIPTIONS: Record<string, Record<string, string>> = {
+  "art-bangkok-1": {
+    en: "Golden spires of Wat Arun illuminated by dusk haze",
+    th: "ยอดพระปรางค์สีทองของวัดอรุณส่องประกายยามพลบค่ำ",
+    es: "Torres doradas de Wat Arun iluminadas por la bruma del atardecer",
+    ja: "夕暮れの霞に照らされるワット・アルンの黄金の塔",
+    zh: "暮色薄雾中熠熠生辉的郑王庙金色尖顶",
+    fr: "Flèches dorées du Wat Arun illuminées par la brume du crépuscule",
+    de: "Goldene Spitzen des Wat Arun im Schein des Abenddunstes",
+    pt: "Pináculos dourados de Wat Arun iluminados pela névoa do entardecer",
+    ru: "Золотые шпили храма Ват Арун в лучах вечерней дымки",
+    ar: "مآذن معبد وات أرون الذهبية تتلألأ في ضباب الغسق",
+    ko: "황혼의 안개 속에 빛나는 왓 아룬의 황금 첨탑",
+    id: "Puncak emas Wat Arun yang diterangi kabut senja",
+    vi: "Ngọn tháp vàng của Wat Arun lung linh trong ráng chiều",
+    hi: "संध्याकाल की धुंध में जगमगाती वाट अरुण की सुनहरी मीनारें",
+  },
+  "art-bangkok-2": {
+    en: "Tropical monsoon clouds rolling over the Chao Phraya River",
+    th: "เมฆมรสุมเขตร้อนพัดผ่านแม่น้ำเจ้าพระยา",
+    es: "Nubes del monzón tropical sobre el río Chao Phraya",
+    ja: "チャオプラヤー川の上空を覆う熱帯モンスーンの雨雲",
+    zh: "热带季风雨云在湄南河上空翻滚",
+    fr: "Nuages de mousson tropicale sur le fleuve Chao Phraya",
+    de: "Tropische Monsunwolken über dem Chao Phraya Fluss",
+    pt: "Nuvens de monção tropical sobre o rio Chao Phraya",
+    ru: "Тропические муссонные тучи над рекой Чао Прайя",
+    ar: "غيوم الرياح الموسمية الاستوائية تعلو نهر تشاو برايا",
+    ko: "차오프라야강 위로 밀려오는 열대 몬순 먹구름",
+    id: "Awan muson tropis bergulung di atas Sungai Chao Phraya",
+    vi: "Mây gió mùa nhiệt đới vần vũ trên dòng sông Chao Phraya",
+    hi: "चाओ फ्राया नदी के ऊपर छाते उष्णकटिबंधीय मानसूनी बादल",
+  },
+  "art-zurich-1": {
+    en: "Snow-dusted Alpine roofs and icy crystalline air",
+    th: "หลังคาบ้านทรงอัลไพน์เคลือบหิมะกับอากาศหนาวเย็นใสบริสุทธิ์",
+    es: "Tejados alpinos cubiertos de nieve y aire cristalino",
+    ja: "雪化粧したアルプスの屋根と澄み渡る冷涼な空気",
+    zh: "覆雪的阿尔卑斯式屋顶与冰清透彻的空气",
+    fr: "Toits alpins saupoudrés de neige et air cristallin",
+    de: "Schneebestäubte Alpendächer und eiskristallklare Luft",
+    pt: "Telhados alpinos cobertos de neve e ar cristalino",
+    ru: "Заснеженные альпийские крыши и морозный кристальный воздух",
+    ar: "أسطح جبال الألب المغطاة بالثلوج وهواء نقي بارد",
+    ko: "눈 덮인 알프스 지붕과 맑고 청량한 겨울 공기",
+    id: "Atap Alpen berlapis salju dan udara dingin sebening kristal",
+    vi: "Mái nhà An-pơ phủ tuyết trắng trong bầu không khí băng giá",
+    hi: "बर्फ से ढकी आल्प्स की छतें और ठंडी बर्फीली हवा",
+  },
+  "art-swiss-2": {
+    en: "Alpine peaks glistening under quiet winter skies",
+    th: "ยอดเขาแอลป์ทอประกายใต้ท้องฟ้าฤดูหนาวอันเงียบสงบ",
+    es: "Picos alpinos relucientes bajo cielos invernales serenos",
+    ja: "静寂な冬空の下で輝くアルプスの峰々",
+    zh: "静谧冬日天空下闪耀的阿尔卑斯山峰",
+    fr: "Sommets alpins scintillants sous un ciel d'hiver paisible",
+    de: "Glitzernde Alpengipfel unter stillem Winterhimmel",
+    pt: "Picos alpinos cintilantes sob o céu sereno de inverno",
+    ru: "Сверкающие альпийские вершины под тихим зимним небом",
+    ar: "قمم جبال الألب المتلألئة تحت سماء الشتاء الهادئة",
+    ko: "고요한 겨울 하늘 아래 반짝이는 알프스 봉우리들",
+    id: "Puncak Alpen berkilau di bawah langit musim dingin yang tenang",
+    vi: "Những đỉnh núi An-pơ lấp lánh dưới bầu trời đông tĩnh lặng",
+    hi: "शांत शीतकालीन आकाश के नीचे चमकती आल्प्स की चोटियाँ",
+  },
+};
+
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  thailand: "TH",
+  switzerland: "CH",
+  "united states": "US",
+  usa: "US",
+  japan: "JP",
+  china: "CN",
+  france: "FR",
+  germany: "DE",
+  spain: "ES",
+  italy: "IT",
+  "united kingdom": "GB",
+  uk: "GB",
+  canada: "CA",
+  australia: "AU",
+  brazil: "BR",
+  russia: "RU",
+  "saudi arabia": "SA",
+  "south korea": "KR",
+  korea: "KR",
+  indonesia: "ID",
+  vietnam: "VN",
+  india: "IN",
+};
+
+function getTranslatedCountry(countryName: string | undefined, lang: string): string {
+  if (!countryName) return "";
+  try {
+    const code = COUNTRY_NAME_TO_CODE[countryName.trim().toLowerCase()];
+    if (code) {
+      const dn = new Intl.DisplayNames([lang], { type: "region" });
+      return dn.of(code) || countryName;
+    }
+  } catch {}
+  return countryName;
+}
+
+function getTranslatedCity(cityName: string, lang: string): string {
+  const shortLang = lang.toLowerCase().split("-")[0];
+  const match = CITIES[cityName];
+  if (match && match[shortLang]) {
+    return match[shortLang];
+  }
+  return cityName;
+}
+
+function getTranslatedArtworkDescription(art: ArtworkSlot, lang: string): string {
+  const shortLang = lang.toLowerCase().split("-")[0];
+  const match = ARTWORK_DESCRIPTIONS[art.id];
+  if (match && match[shortLang]) {
+    return match[shortLang];
+  }
+  return art.description;
+}
+
 function getWeatherSolidColor(code: number | undefined, isDay: boolean, skyPreset?: string): string {
   if (skyPreset && skyPreset !== "auto") {
     switch (skyPreset) {
@@ -213,6 +435,22 @@ function getConditionTranslation(code: number, t: (k: string, fallback?: string)
   if (code >= 85 && code <= 86) return t("cond_snow_showers", "Snow showers");
   if (code >= 95 && code <= 99) return t("cond_thunderstorm", "Thunderstorm");
   return t("cond_partly_cloudy", "Partly cloudy");
+}
+
+async function searchCitiesLocalized(query: string, lang: string): Promise<CityResult[]> {
+  const shortLang = lang.toLowerCase().split("-")[0] || "en";
+  const response = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&format=json&language=${encodeURIComponent(shortLang)}`
+  );
+  if (!response.ok) return [];
+  const payload = await response.json();
+  return (payload.results ?? []).map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    country: r.country,
+    lat: r.latitude,
+    lon: r.longitude,
+  }));
 }
 
 function WeatherApp() {
@@ -324,14 +562,14 @@ function WeatherApp() {
     }
     const timer = setTimeout(async () => {
       try {
-        const results = await searchCities(searchQuery.trim());
+        const results = await searchCitiesLocalized(searchQuery.trim(), activeLang);
         setSearchResults(results);
       } catch {
         setSearchResults([]);
       }
     }, 280);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, activeLang]);
 
   const toggleFavorite = (place: Place) => {
     setFavorites((prev: Place[]) => {
@@ -656,7 +894,7 @@ function WeatherApp() {
                     <button
                       type="button"
                       onClick={() => setSettingsOpen(false)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -666,10 +904,10 @@ function WeatherApp() {
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-amber-700 dark:text-amber-300">
-                        Root Beer Supporter Tiers
+                        {t("support_title", "Root Beer Supporter Tiers")}
                       </span>
                       <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                        Lifetime Perks
+                        Lifetime
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -829,7 +1067,7 @@ function WeatherApp() {
           </div>
         </header>
 
-        {/* 1. CITY SEARCH */}
+        {/* 1. CITY SEARCH (Localized with Open-Meteo language param) */}
         <div className="relative z-20">
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
@@ -864,10 +1102,10 @@ function WeatherApp() {
                   className="w-full rounded-xl px-3 py-2 text-left hover:bg-muted transition flex items-center justify-between cursor-pointer"
                 >
                   <span className="font-semibold text-foreground">
-                    {result.name}
+                    {getTranslatedCity(result.name, activeLang)}
                     {result.country && (
                       <span className="ml-1 text-muted-foreground font-normal">
-                        ({result.country})
+                        ({getTranslatedCountry(result.country, activeLang)})
                       </span>
                     )}
                   </span>
@@ -907,7 +1145,7 @@ function WeatherApp() {
                     : "border-border/60 bg-card/70 text-muted-foreground hover:text-foreground hover:bg-card"
                 }`}
               >
-                {fav.name}
+                {getTranslatedCity(fav.name, activeLang)}
               </button>
             ))}
           </div>
@@ -920,12 +1158,12 @@ function WeatherApp() {
           </div>
         )}
 
-        {/* 3. DEDICATED FULL-SIZE AI WALLPAPER / ARTWORK CANVAS WITH DOWNLOAD */}
+        {/* 3. DEDICATED FULL-SIZE AI WALLPAPER / ARTWORK CANVAS (Fully Translated) */}
         <div className="overflow-hidden rounded-3xl border border-border/80 bg-card/85 shadow-lg backdrop-blur-md transition-all">
           <div className="relative aspect-16/9 w-full overflow-hidden bg-muted/40">
             <img
               src={activeWallpaper.url}
-              alt={activeWallpaper.description}
+              alt={getTranslatedArtworkDescription(activeWallpaper, activeLang)}
               className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30 pointer-events-none" />
@@ -942,17 +1180,17 @@ function WeatherApp() {
                   type="button"
                   onClick={() => handleDownloadWallpaper(activeWallpaper)}
                   className="flex items-center gap-1 rounded-full bg-black/40 px-2.5 py-1 text-xs font-medium backdrop-blur-md border border-white/10 hover:bg-black/60 transition cursor-pointer"
-                  title="Download Wallpaper Image"
+                  title="Download Wallpaper"
                 >
                   {downloadSuccess ? (
                     <>
                       <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-emerald-300 font-bold">Saved!</span>
+                      <span className="text-emerald-300 font-bold">{t("saved", "Saved!")}</span>
                     </>
                   ) : (
                     <>
                       <Download className="h-3.5 w-3.5" />
-                      <span>Save</span>
+                      <span>{t("save", "Save")}</span>
                     </>
                   )}
                 </button>
@@ -980,16 +1218,16 @@ function WeatherApp() {
               <div className="max-w-[75%] space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-bold tracking-tight text-white drop-shadow-sm">
-                    {activeWallpaper.cityName}
+                    {getTranslatedCity(activeWallpaper.cityName, activeLang)}
                   </p>
                   {activeWallpaper.isAiGenerated && (
                     <span className="rounded-full bg-amber-500/80 px-1.5 py-0.2 text-[9px] font-bold text-white shadow-xs">
-                      AI Saved
+                      {t("tab_saved", "Saved")}
                     </span>
                   )}
                 </div>
                 <p className="text-[11px] text-white/80 line-clamp-1 drop-shadow-sm">
-                  {activeWallpaper.description}
+                  {getTranslatedArtworkDescription(activeWallpaper, activeLang)}
                 </p>
               </div>
               <button
@@ -1015,11 +1253,11 @@ function WeatherApp() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
-                    {weather.place.name}
+                    {getTranslatedCity(weather.place.name, activeLang)}
                   </h2>
                   {weather.place.country && (
                     <span className="text-xs font-semibold text-muted-foreground">
-                      , {weather.place.country}
+                      , {getTranslatedCountry(weather.place.country, activeLang)}
                     </span>
                   )}
                 </div>
@@ -1325,7 +1563,7 @@ function WeatherApp() {
         </footer>
       </div>
 
-      {/* GALLERY MODAL WITH TABS & ACTIONS */}
+      {/* GALLERY MODAL (Fully Translated) */}
       {galleryOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1369,8 +1607,8 @@ function WeatherApp() {
             <div className="grid grid-cols-2 gap-3">
               {displayedGalleryArt.length === 0 ? (
                 <div className="col-span-2 py-8 text-center text-xs text-muted-foreground space-y-1">
-                  <p className="font-semibold">No saved AI artwork yet.</p>
-                  <p>Use the AI Watercolor studio to generate and save custom landmarks!</p>
+                  <p className="font-semibold">{t("no_saved", "No saved cities yet - Try searching above ↑")}</p>
+                  <p>{t("tab_generate", "Generate with AI")}</p>
                 </div>
               ) : (
                 displayedGalleryArt.map((art: ArtworkSlot) => {
@@ -1387,7 +1625,7 @@ function WeatherApp() {
                       <div className="aspect-16/10 w-full overflow-hidden bg-muted relative">
                         <img
                           src={art.url}
-                          alt={art.description}
+                          alt={getTranslatedArtworkDescription(art, activeLang)}
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                         />
                         {/* Quick action buttons on card */}
@@ -1417,7 +1655,7 @@ function WeatherApp() {
                       </div>
                       <div className="p-2 space-y-0.5 bg-card/90">
                         <div className="flex items-center justify-between text-xs font-bold text-foreground">
-                          <span className="truncate pr-1">{art.cityName}</span>
+                          <span className="truncate pr-1">{getTranslatedCity(art.cityName, activeLang)}</span>
                           {!unlocked && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
                           {isActive && (
                             <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[9px] font-bold text-amber-700 dark:text-amber-300 shrink-0">
@@ -1425,7 +1663,9 @@ function WeatherApp() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-muted-foreground line-clamp-1">{art.description}</p>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">
+                          {getTranslatedArtworkDescription(art, activeLang)}
+                        </p>
                       </div>
                     </div>
                   );
@@ -1436,8 +1676,8 @@ function WeatherApp() {
             {/* Supporter Banner inside Gallery */}
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
-                <span>Unlock All Artwork with Root Beer</span>
-                <span>From $1</span>
+                <span>{t("support_title", "Unlock All Artwork with Root Beer")}</span>
+                <span>$1+</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5 pt-1">
                 {SORTED_TIERS.map((tier: RootBeerTier) => (
@@ -1466,12 +1706,14 @@ function WeatherApp() {
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                 <Lock className="h-4 w-4 text-amber-500" />
-                <span>Unlock {pendingUnlockTarget.cityName} Wallpaper</span>
+                <span>
+                  Unlock {getTranslatedCity(pendingUnlockTarget.cityName, activeLang)} Wallpaper
+                </span>
               </div>
               <button
                 type="button"
                 onClick={() => setPendingUnlockTarget(null)}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1539,7 +1781,7 @@ function WeatherApp() {
           <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-5 shadow-2xl space-y-3">
             <div className="flex items-center gap-2 text-foreground font-bold text-sm">
               <MapPin className="h-4 w-4 text-amber-500" />
-              <span>Use Your GPS Location?</span>
+              <span>{t("use_location", "Use Your GPS Location?")}</span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               We request your GPS location only to fetch your immediate local
