@@ -142,6 +142,14 @@ const LANDMARK_WATERCOLORS: ArtworkSlot[] = [
   },
 ];
 
+const DEFAULT_ARTWORK: ArtworkSlot = LANDMARK_WATERCOLORS[0] ?? {
+  id: "art-default",
+  cityName: "Bangkok",
+  url: "/backgrounds/vibrant/ratchaburi_haze.jpg",
+  description: "Watercolor city scene",
+  isUnlockedDefault: true,
+};
+
 const LANGUAGES = [
   { code: "en", flag: "🇺🇸", label: "English" },
   { code: "th", flag: "🇹🇭", label: "ไทย (Thai)" },
@@ -365,7 +373,7 @@ function getTranslatedCountry(countryName: string | undefined, lang: string): st
 }
 
 function getTranslatedCity(cityName: string, lang: string): string {
-  const shortLang = lang.toLowerCase().split("-")[0];
+  const shortLang = lang.toLowerCase().split("-")[0] || "en";
   const match = CITIES[cityName];
   if (match && match[shortLang]) {
     return match[shortLang];
@@ -374,7 +382,7 @@ function getTranslatedCity(cityName: string, lang: string): string {
 }
 
 function getTranslatedArtworkDescription(art: ArtworkSlot, lang: string): string {
-  const shortLang = lang.toLowerCase().split("-")[0];
+  const shortLang = lang.toLowerCase().split("-")[0] || "en";
   const match = ARTWORK_DESCRIPTIONS[art.id];
   if (match && match[shortLang]) {
     return match[shortLang];
@@ -422,7 +430,7 @@ function getWeatherSolidColor(code: number | undefined, isDay: boolean, skyPrese
   return isDay ? "#38bdf8" : "#0f172a";
 }
 
-function getConditionTranslation(code: number, t: (k: string, fallback?: string) => string): string {
+function getConditionTranslation(code: number, t: (k: string, fallback: string) => string): string {
   if (code === 0) return t("cond_clear", "Clear sky");
   if (code === 1 || code === 2) return t("cond_partly_cloudy", "Partly cloudy");
   if (code === 3) return t("cond_overcast", "Overcast");
@@ -500,7 +508,7 @@ function WeatherApp() {
   });
   const [activeWallpaper, setActiveWallpaper] = useState<ArtworkSlot>(() => {
     const saved = loadSavedAiArtworks();
-    return saved[0] || LANDMARK_WATERCOLORS[0];
+    return saved[0] ?? DEFAULT_ARTWORK;
   });
 
   const [creatorCity, setCreatorCity] = useState("");
@@ -593,7 +601,7 @@ function WeatherApp() {
   const handleSelectCity = (result: CityResult) => {
     const nextPlace: Place = {
       name: result.name,
-      country: result.country,
+      ...(result.country ? { country: result.country } : {}),
       lat: result.lat,
       lon: result.lon,
     };
@@ -645,6 +653,7 @@ function WeatherApp() {
     const currentIndex = availableArtworks.findIndex((a: ArtworkSlot) => a.id === activeWallpaper.id);
     const nextIndex = (currentIndex + 1) % availableArtworks.length;
     const target = availableArtworks[nextIndex];
+    if (!target) return;
     if (isSlotUnlocked(target)) {
       setActiveWallpaper(target);
     } else {
@@ -711,7 +720,7 @@ function WeatherApp() {
     removeSavedAiArtwork(id);
     setAvailableArtworks((prev) => prev.filter((a) => a.id !== id));
     if (activeWallpaper.id === id) {
-      setActiveWallpaper(LANDMARK_WATERCOLORS[0]);
+      setActiveWallpaper(DEFAULT_ARTWORK);
     }
   };
 
@@ -1262,7 +1271,7 @@ function WeatherApp() {
                   )}
                 </div>
                 <p className="text-xs font-medium text-muted-foreground/90">
-                  {getConditionTranslation(weather.current.code, t)}
+                  {getConditionTranslation(weather.current.code, (key, fallback) => t(key, { defaultValue: fallback }))}
                 </p>
               </div>
 
@@ -1364,7 +1373,7 @@ function WeatherApp() {
                     <WeatherIcon code={h.code} isDay={h.isDay} className="h-full w-full" />
                   </div>
                   <span className="text-[10px] font-semibold text-foreground/80 line-clamp-1 h-3.5">
-                    {getConditionTranslation(h.code, t)}
+                    {getConditionTranslation(h.code, (key, fallback) => t(key, { defaultValue: fallback }))}
                   </span>
                   <span className="text-xs font-bold text-foreground">
                     {Math.round(h.temperature)}°
@@ -1401,7 +1410,7 @@ function WeatherApp() {
                       <WeatherIcon code={d.code} isDay={true} className="h-full w-full" />
                     </div>
                     <span className="text-muted-foreground font-medium truncate max-w-[130px]">
-                      {getConditionTranslation(d.code, t)}
+                      {getConditionTranslation(d.code, (key, fallback) => t(key, { defaultValue: fallback }))}
                     </span>
                   </div>
 
