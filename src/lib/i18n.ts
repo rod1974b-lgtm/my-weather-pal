@@ -275,3 +275,4 @@ export const setAppLanguage = async (lang: string) => {
   await i18n.changeLanguage(lang);
 };
 export default M;
+import "./i18n-missing-keys";
