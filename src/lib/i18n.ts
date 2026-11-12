@@ -276,3 +276,5 @@ export const setAppLanguage = async (lang: string) => {
 };
 export default M;
 import "./i18n-missing-keys";
+import "./i18n-gallery-keys";
+import "./i18n-root-keys";
