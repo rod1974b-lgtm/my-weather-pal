@@ -3,7 +3,7 @@
 // FIX: import the APP's i18n instance from ./i18n, NOT from "i18next".
 // The old version used the raw i18next singleton, which is a different instance
 // than the one your app renders with, so none of these keys ever appeared.
-import i18n from "./i18n";
+import i18n from "i18next";
 
 const M: Record<string, Record<string, string>> = {
   en: {
