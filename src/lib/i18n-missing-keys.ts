@@ -1,12 +1,7 @@
-// src/lib/i18n-missing-keys.ts — FULL REPLACEMENT ADDON
-// 1. Copy this file to src/lib/i18n-missing-keys.ts in your repo
-// 2. In src/lib/i18n.ts add at the very bottom:  import "./i18n-missing-keys";
-// 3. This adds EVERY missing key for ALL 14 languages, without touching your existing translations.
-// It uses i18n.addResources so it never overwrites your existing th/es/ja/... strings.
-import i18n from "i18next";
-// Safe: imports from i18next only - no circular import, no SSR crash.
-
-const M: Record<string, Record<string, string>> = {
+// src/lib/i18n-missing-keys-DATA.ts — DATA ONLY, NO side effects
+// DO NOT import i18n here. DO NOT call addResource here.
+// i18n.ts imports this data and merges it into resources BEFORE i18n.init().
+export const M: Record<string, Record<string, string>> = {
   en: {
     support_title: "Root Beer Supporter Tiers", support_desc: "Unlock full sky catalogs, bonus AI generations, and ad-free browsing forever.",
     metric: "Metric (°C, km/h)", imperial: "US Imperial (°F, mph)", saved: "Saved!", save: "Save",
@@ -261,23 +256,8 @@ const M: Record<string, Record<string, string>> = {
   }
 };
 
-// Safe apply: never crashes if i18n is not ready yet (SSR / white-screen fix).
-// No direct init-flag access - that read crashed when i18n was undefined.
-const applyMissingKeys = () => {
-  try {
-    const inst: any = i18n as any;
-    if (!inst || typeof inst.addResource !== "function") return;
-    for (const lang of Object.keys(M)) {
-      for (const [k, v] of Object.entries(M[lang])) {
-        try {
-          if (typeof inst.exists === "function" && inst.exists(k, { lng: lang })) continue;
-          inst.addResource(lang, "translation", k, v);
-        } catch {}
-      }
-    }
-  } catch {}
-};
-applyMissingKeys();
+export default M;
+
 export const setAppLanguage = async (lang: string) => {
   const all = ["en","th","es","ja","zh","fr","de","pt","ru","ar","ko","id","vi","hi"];
   if (!all.includes(lang)) return;
@@ -288,7 +268,7 @@ export const setAppLanguage = async (lang: string) => {
       document.documentElement.lang = lang;
       document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
     }
+    const { default: i18n } = await import("i18next");
     await (i18n as any)?.changeLanguage?.(lang);
   } catch {}
 };
-export default M;
