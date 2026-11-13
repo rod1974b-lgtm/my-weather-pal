@@ -1792,3 +1792,6 @@ if (typeof document !== "undefined") {
 }
 
 export default i18n;
+import "./i18n-missing-keys";
+import "./i18n-gallery-keys";
+import "./i18n-root-keys";
