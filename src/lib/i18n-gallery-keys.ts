@@ -1,7 +1,7 @@
 // src/lib/i18n-gallery-keys.ts — FIXED
 // Put this file in src/lib/ (same folder as i18n.ts)
 // FIX: import the APP's i18n instance from ./i18n, NOT from "i18next".
-import i18n from "./i18n";
+import i18n from "i18next";
 const G: Record<string, Record<string, string>> = {
   en: { gallery_back: "Back to weather", gallery_kicker: "A PAINTED ATLAS", gallery_title: "A little weather, a lot of place.", gallery_subtitle: "Watercolor glimpses from cities around the world.", gallery_weather: "Weather", gallery_privacy: "Privacy", gallery_close: "Close", gallery_preview: "Artwork preview", gallery_preview_alt: "Watercolor city artwork", gallery_view_artwork: "View {{city}} artwork", gallery_alt: "{{city}}, {{country}} in watercolor", gallery_meta_title: "City art · My Weather Pal", gallery_meta_desc: "Explore watercolor city scenes and open a local weather forecast in My Weather Pal.", country_thailand: "Thailand", country_japan: "Japan", country_north_macedonia: "North Macedonia", country_switzerland: "Switzerland" },
   th: { gallery_back: "กลับไปหน้าอากาศ", gallery_kicker: "แผนที่ภาพวาด", gallery_title: "อากาศนิดหน่อย สถานที่มากมาย", gallery_subtitle: "ภาพสีน้ำจากเมืองต่างๆ ทั่วโลก", gallery_weather: "อากาศ", gallery_privacy: "ความเป็นส่วนตัว", gallery_close: "ปิด", gallery_preview: "ตัวอย่างผลงาน", gallery_preview_alt: "ภาพสีน้ำเมือง", gallery_view_artwork: "ดูผลงาน {{city}}", gallery_alt: "{{city}}, {{country}} ในภาพสีน้ำ", gallery_meta_title: "ศิลปะเมือง · My Weather Pal", gallery_meta_desc: "สำรวจฉากสีน้ำเมืองต่างๆ และเปิดพยากรณ์อากาศท้องถิ่นใน My Weather Pal", country_thailand: "ประเทศไทย", country_japan: "ญี่ปุ่น", country_north_macedonia: "มาซิโดเนียเหนือ", country_switzerland: "สวิตเซอร์แลนด์" },
