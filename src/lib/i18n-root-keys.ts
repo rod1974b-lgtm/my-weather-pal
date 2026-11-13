@@ -1,8 +1,7 @@
-// src/lib/i18n-root-keys.ts — NEW FILE, copy exactly
-// Add in src/lib/i18n.ts bottom: import "./i18n-root-keys";
-// These are the extra keys used ONLY by the new index.tsx
-import i18n from "i18next";
-const R: Record<string, Record<string, string>> = {
+// src/lib/i18n-root-keys-DATA.ts — DATA ONLY, NO side effects
+// DO NOT import i18n here. DO NOT call addResource here.
+// i18n.ts imports this data and merges it into resources BEFORE i18n.init().
+export const R: Record<string, Record<string, string>> = {
   en: { lifetime: "Lifetime", ai_model_label: "GPT Sunburst 2.5", gps_location_name: "My GPS Location", uploaded_reference: "Uploaded landmark reference", download_wallpaper: "Download Wallpaper", delete_saved_art: "Delete saved art", from_price: "$1+", wear_business_tip: "Pair with structured suiting and polished all-weather footwear.", wear_sports_tip: "Opt for moisture-wicking activewear and flexible grip trainers." },
   th: { lifetime: "ตลอดชีพ", ai_model_label: "GPT Sunburst 2.5", gps_location_name: "ตำแหน่ง GPS ของฉัน", uploaded_reference: "รูปอ้างอิงแลนด์มาร์กที่อัปโหลด", download_wallpaper: "ดาวน์โหลดวอลเปเปอร์", delete_saved_art: "ลบผลงานที่บันทึก", from_price: "$1+", wear_business_tip: "จับคู่กับสูททรงสวยและรองเท้ากันทุกสภาพอากาศ", wear_sports_tip: "เลือกชุดกีฬาระบายความชื้นและรองเท้าที่เกาะพื้นดี" },
   es: { lifetime: "De por vida", ai_model_label: "GPT Sunburst 2.5", gps_location_name: "Mi ubicación GPS", uploaded_reference: "Referencia de lugar subida", download_wallpaper: "Descargar fondo", delete_saved_art: "Eliminar arte guardado", from_price: "1$+", wear_business_tip: "Combina con traje estructurado y calzado elegante para todo clima.", wear_sports_tip: "Elige ropa deportiva que absorba la humedad y zapatillas con buen agarre." },
@@ -18,5 +17,5 @@ const R: Record<string, Record<string, string>> = {
   vi: { lifetime: "Trọn đời", ai_model_label: "GPT Sunburst 2.5", gps_location_name: "Vị trí GPS của tôi", uploaded_reference: "Tham chiếu địa danh đã tải lên", download_wallpaper: "Tải hình nền", delete_saved_art: "Xóa tác phẩm đã lưu", from_price: "$1+", wear_business_tip: "Kết hợp với bộ đồ cấu trúc và giày thanh lịch cho mọi thời tiết.", wear_sports_tip: "Chọn đồ thể thao thấm hút mồ hôi và giày tập bám tốt." },
   hi: { lifetime: "आजीवन", ai_model_label: "GPT Sunburst 2.5", gps_location_name: "मेरा GPS स्थान", uploaded_reference: "अपलोड किया गया लैंडमार्क संदर्भ", download_wallpaper: "वॉलपेपर डाउनलोड करें", delete_saved_art: "सहेजी गई कला हटाएं", from_price: "$1+", wear_business_tip: "संरचित सूट और हर मौसम के शानदार जूतों के साथ पहनें।", wear_sports_tip: "नमी सोखने वाले एक्टिववियर और अच्छी पकड़ वाले ट्रेनर चुनें।" }
 };
-for (const lang of Object.keys(R)) for (const [k, v] of Object.entries(R[lang])) { try { i18n.addResource(lang, "translation", k, v); } catch {} }
+
 export default R;
