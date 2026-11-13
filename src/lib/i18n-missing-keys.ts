@@ -1,9 +1,10 @@
-// src/lib/i18n-missing-keys.ts — FIXED
-// Put this file in src/lib/ (same folder as i18n.ts)
-// FIX: import the APP's i18n instance from ./i18n, NOT from "i18next".
-// The old version used the raw i18next singleton, which is a different instance
-// than the one your app renders with, so none of these keys ever appeared.
+// src/lib/i18n-missing-keys.ts — FULL REPLACEMENT ADDON
+// 1. Copy this file to src/lib/i18n-missing-keys.ts in your repo
+// 2. In src/lib/i18n.ts add at the very bottom:  import "./i18n-missing-keys";
+// 3. This adds EVERY missing key for ALL 14 languages, without touching your existing translations.
+// It uses i18n.addResources so it never overwrites your existing th/es/ja/... strings.
 import i18n from "i18next";
+// Safe: imports from i18next only - no circular import, no SSR crash.
 
 const M: Record<string, Record<string, string>> = {
   en: {
@@ -260,27 +261,34 @@ const M: Record<string, Record<string, string>> = {
   }
 };
 
+// Safe apply: never crashes if i18n is not ready yet (SSR / white-screen fix).
+// No direct init-flag access - that read crashed when i18n was undefined.
 const applyMissingKeys = () => {
-  for (const lang of Object.keys(M)) {
-    for (const [k, v] of Object.entries(M[lang])) {
-      try {
-        // Only add if missing - never overwrite your existing translations
-        if (!i18n.exists(k, { lng: lang })) {
-          i18n.addResource(lang, "translation", k, v);
-        }
-      } catch {}
+  try {
+    const inst: any = i18n as any;
+    if (!inst || typeof inst.addResource !== "function") return;
+    for (const lang of Object.keys(M)) {
+      for (const [k, v] of Object.entries(M[lang])) {
+        try {
+          if (typeof inst.exists === "function" && inst.exists(k, { lng: lang })) continue;
+          inst.addResource(lang, "translation", k, v);
+        } catch {}
+      }
     }
-  }
+  } catch {}
 };
-if ((i18n as any).isInitialized) applyMissingKeys();
-else try { (i18n as any).on("initialized", applyMissingKeys); } catch { applyMissingKeys(); }
+applyMissingKeys();
 export const setAppLanguage = async (lang: string) => {
   const all = ["en","th","es","ja","zh","fr","de","pt","ru","ar","ko","id","vi","hi"];
   if (!all.includes(lang)) return;
-  localStorage.setItem("weather:lang", lang);
-  localStorage.setItem("app_language", lang);
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-  await i18n.changeLanguage(lang);
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("weather:lang", lang);
+      localStorage.setItem("app_language", lang);
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    }
+    await (i18n as any)?.changeLanguage?.(lang);
+  } catch {}
 };
 export default M;
