@@ -2,6 +2,9 @@ import { createRootRoute, Outlet, ScrollRestoration } from "@tanstack/react-rout
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import "@/lib/i18n";
+import "./i18n-missing-keys";
+import "./i18n-gallery-keys";
+import "./i18n-root-keys";
 
 function RootComponent() {
   const { i18n } = useTranslation();
