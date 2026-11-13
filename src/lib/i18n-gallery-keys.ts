@@ -1,7 +1,8 @@
-// src/lib/i18n-gallery-keys.ts — FIXED
-// Put this file in src/lib/ (same folder as i18n.ts)
-// FIX: import the APP's i18n instance from ./i18n, NOT from "i18next".
+// src/lib/i18n-gallery-keys.ts — NEW FILE, copy exactly
+// Add ONE line in src/lib/i18n.ts bottom:  import "./i18n-gallery-keys";
+// Also imported automatically by gallery.tsx
 import i18n from "i18next";
+// Safe: imports from i18next only - no circular import, no SSR crash.
 const G: Record<string, Record<string, string>> = {
   en: { gallery_back: "Back to weather", gallery_kicker: "A PAINTED ATLAS", gallery_title: "A little weather, a lot of place.", gallery_subtitle: "Watercolor glimpses from cities around the world.", gallery_weather: "Weather", gallery_privacy: "Privacy", gallery_close: "Close", gallery_preview: "Artwork preview", gallery_preview_alt: "Watercolor city artwork", gallery_view_artwork: "View {{city}} artwork", gallery_alt: "{{city}}, {{country}} in watercolor", gallery_meta_title: "City art · My Weather Pal", gallery_meta_desc: "Explore watercolor city scenes and open a local weather forecast in My Weather Pal.", country_thailand: "Thailand", country_japan: "Japan", country_north_macedonia: "North Macedonia", country_switzerland: "Switzerland" },
   th: { gallery_back: "กลับไปหน้าอากาศ", gallery_kicker: "แผนที่ภาพวาด", gallery_title: "อากาศนิดหน่อย สถานที่มากมาย", gallery_subtitle: "ภาพสีน้ำจากเมืองต่างๆ ทั่วโลก", gallery_weather: "อากาศ", gallery_privacy: "ความเป็นส่วนตัว", gallery_close: "ปิด", gallery_preview: "ตัวอย่างผลงาน", gallery_preview_alt: "ภาพสีน้ำเมือง", gallery_view_artwork: "ดูผลงาน {{city}}", gallery_alt: "{{city}}, {{country}} ในภาพสีน้ำ", gallery_meta_title: "ศิลปะเมือง · My Weather Pal", gallery_meta_desc: "สำรวจฉากสีน้ำเมืองต่างๆ และเปิดพยากรณ์อากาศท้องถิ่นใน My Weather Pal", country_thailand: "ประเทศไทย", country_japan: "ญี่ปุ่น", country_north_macedonia: "มาซิโดเนียเหนือ", country_switzerland: "สวิตเซอร์แลนด์" },
@@ -18,11 +19,21 @@ const G: Record<string, Record<string, string>> = {
   vi: { gallery_back: "Quay lại thời tiết", gallery_kicker: "ATLAS ĐƯỢC VẼ", gallery_title: "Một chút thời tiết, nhiều nơi chốn.", gallery_subtitle: "Những thoáng màu nước từ các thành phố khắp thế giới.", gallery_weather: "Thời tiết", gallery_privacy: "Riêng tư", gallery_close: "Đóng", gallery_preview: "Xem trước tác phẩm", gallery_preview_alt: "Tranh màu nước thành phố", gallery_view_artwork: "Xem tác phẩm {{city}}", gallery_alt: "{{city}}, {{country}} bằng màu nước", gallery_meta_title: "Nghệ thuật thành phố · My Weather Pal", gallery_meta_desc: "Khám phá cảnh thành phố màu nước và mở dự báo địa phương trong My Weather Pal.", country_thailand: "Thái Lan", country_japan: "Nhật Bản", country_north_macedonia: "Bắc Macedonia", country_switzerland: "Thụy Sĩ" },
   hi: { gallery_back: "मौसम पर वापस जाएं", gallery_kicker: "एक चित्रित एटलस", gallery_title: "थोड़ा मौसम, बहुत सारी जगह।", gallery_subtitle: "दुनिया भर के शहरों की वॉटरकलर झलकियाँ।", gallery_weather: "मौसम", gallery_privacy: "गोपनीयता", gallery_close: "बंद करें", gallery_preview: "कलाकृति पूर्वावलोकन", gallery_preview_alt: "वॉटरकलर शहर कलाकृति", gallery_view_artwork: "{{city}} कलाकृति देखें", gallery_alt: "वॉटरकलर में {{city}}, {{country}}", gallery_meta_title: "शहर कला · My Weather Pal", gallery_meta_desc: "वॉटरकलर शहर दृश्यों का अन्वेषण करें और My Weather Pal में स्थानीय मौसम पूर्वानुमान खोलें।", country_thailand: "थाईलैंड", country_japan: "जापान", country_north_macedonia: "उत्तर मैसेडोनिया", country_switzerland: "स्विट्जरलैंड" }
 };
+// Safe apply: never crashes if i18n is not ready yet (SSR / white-screen fix).
+// No direct init-flag access - that read crashed when i18n was undefined.
 const applyGalleryKeys = () => {
-  for (const lang of Object.keys(G)) for (const [k, v] of Object.entries(G[lang])) {
-    try { if (!i18n.exists(k, { lng: lang })) i18n.addResource(lang, "translation", k, v); } catch {}
-  }
+  try {
+    const inst: any = i18n as any;
+    if (!inst || typeof inst.addResource !== "function") return;
+    for (const lang of Object.keys(G)) {
+      for (const [k, v] of Object.entries(G[lang])) {
+        try {
+          if (typeof inst.exists === "function" && inst.exists(k, { lng: lang })) continue;
+          inst.addResource(lang, "translation", k, v);
+        } catch {}
+      }
+    }
+  } catch {}
 };
-if ((i18n as any).isInitialized) applyGalleryKeys();
-else try { (i18n as any).on("initialized", applyGalleryKeys); } catch { applyGalleryKeys(); }
+applyGalleryKeys();
 export default G;
