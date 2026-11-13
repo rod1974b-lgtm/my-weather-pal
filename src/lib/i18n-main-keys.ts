@@ -1,10 +1,7 @@
-// src/lib/i18n-main-keys.ts — FULL NEW FILE
-// This fixes the site showing raw keys like app_title, all_clear, tab_generate
-// Those 78 main keys were NOT in i18n-missing-keys or i18n-gallery-keys - they belong in src/lib/i18n.ts
-// Lovable deleted / broke i18n.ts resources, so this file re-adds them safely.
-// Put this file in src/lib/ and add ONE line to src/lib/i18n.ts bottom: import "./i18n-main-keys";
-import i18n from "i18next";
-const MAIN: Record<string, Record<string,string>> = {
+// src/lib/i18n-main-keys-DATA.ts — DATA ONLY, NO side effects
+// DO NOT import i18n here. DO NOT call addResource here.
+// i18n.ts imports this data and merges it into resources BEFORE i18n.init().
+export const MAIN: Record<string, Record<string, string>> = {
   en: {
     add_fav: "Add to favorites",
     ai_creator_desc: "Create a watercolor landmark scene from a city and description.",
@@ -162,6 +159,5 @@ const MAIN: Record<string, Record<string,string>> = {
     wind: "ลม",
   },
 };
-const applyMainKeys = () => { try { const inst:any=i18n as any; if(!inst||typeof inst.addResource!=="function") return; for(const lang of Object.keys(MAIN)) for(const [k,v] of Object.entries(MAIN[lang])) { try { if(typeof inst.exists==="function" && inst.exists(k,{lng:lang})) continue; inst.addResource(lang,"translation",k,v); } catch {} } } catch {} };
-applyMainKeys();
+
 export default MAIN;
