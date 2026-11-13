@@ -1,6 +1,6 @@
-// src/lib/i18n-gallery-keys.ts — NEW FILE, copy exactly
-// Add ONE line in src/lib/i18n.ts bottom:  import "./i18n-gallery-keys";
-// Also imported automatically by gallery.tsx
+// src/lib/i18n-gallery-keys.ts — FIXED
+// Put this file in src/lib/ (same folder as i18n.ts)
+// FIXED: import from i18next only - the local ./i18n import caused a circular import.
 import i18n from "i18next";
 // Safe: imports from i18next only - no circular import, no SSR crash.
 const G: Record<string, Record<string, string>> = {
@@ -19,8 +19,8 @@ const G: Record<string, Record<string, string>> = {
   vi: { gallery_back: "Quay lại thời tiết", gallery_kicker: "ATLAS ĐƯỢC VẼ", gallery_title: "Một chút thời tiết, nhiều nơi chốn.", gallery_subtitle: "Những thoáng màu nước từ các thành phố khắp thế giới.", gallery_weather: "Thời tiết", gallery_privacy: "Riêng tư", gallery_close: "Đóng", gallery_preview: "Xem trước tác phẩm", gallery_preview_alt: "Tranh màu nước thành phố", gallery_view_artwork: "Xem tác phẩm {{city}}", gallery_alt: "{{city}}, {{country}} bằng màu nước", gallery_meta_title: "Nghệ thuật thành phố · My Weather Pal", gallery_meta_desc: "Khám phá cảnh thành phố màu nước và mở dự báo địa phương trong My Weather Pal.", country_thailand: "Thái Lan", country_japan: "Nhật Bản", country_north_macedonia: "Bắc Macedonia", country_switzerland: "Thụy Sĩ" },
   hi: { gallery_back: "मौसम पर वापस जाएं", gallery_kicker: "एक चित्रित एटलस", gallery_title: "थोड़ा मौसम, बहुत सारी जगह।", gallery_subtitle: "दुनिया भर के शहरों की वॉटरकलर झलकियाँ।", gallery_weather: "मौसम", gallery_privacy: "गोपनीयता", gallery_close: "बंद करें", gallery_preview: "कलाकृति पूर्वावलोकन", gallery_preview_alt: "वॉटरकलर शहर कलाकृति", gallery_view_artwork: "{{city}} कलाकृति देखें", gallery_alt: "वॉटरकलर में {{city}}, {{country}}", gallery_meta_title: "शहर कला · My Weather Pal", gallery_meta_desc: "वॉटरकलर शहर दृश्यों का अन्वेषण करें और My Weather Pal में स्थानीय मौसम पूर्वानुमान खोलें।", country_thailand: "थाईलैंड", country_japan: "जापान", country_north_macedonia: "उत्तर मैसेडोनिया", country_switzerland: "स्विट्जरलैंड" }
 };
-// Safe apply: never crashes if i18n is not ready yet (SSR / white-screen fix).
-// No direct init-flag access - that read crashed when i18n was undefined.
+// Safe apply: never crashes if i18n is not ready yet.
+// No init-flag access - that read crashed SSR and broke main translations.
 const applyGalleryKeys = () => {
   try {
     const inst: any = i18n as any;
